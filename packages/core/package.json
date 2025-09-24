@@ -16,5 +16,13 @@
   "devDependencies": {
     "@types/node": "^18",
     "typescript": "~5.9.2"
+  },
+  "dependencies": {
+    "@google/genai": "^1.20.0",
+    "@openai/agents": "^0.1.4",
+    "@openai/agents-core": "^0.1.4",
+    "nanoid": "^5.1.6",
+    "openai": "^5.23.0",
+    "zod": "4"
   }
 }
