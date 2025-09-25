@@ -14,7 +14,12 @@
     "moduleResolution": "node16",
     "isolatedModules": true,
     "incremental": true,
+    "verbatimModuleSyntax": true,
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["node_modules"]
+  "include": [
+    "src/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
 }

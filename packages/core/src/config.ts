@@ -18,6 +18,14 @@ export type Config = {
   };
 };
 
+export type ConfigInput = Partial<{
+  commentGenerator: Partial<CommentGeneratorConfig>;
+  decisionEngine: Partial<DecisionEngineConfig>;
+  eventDetector: Partial<EventDetectorConfig>;
+  contextBuffer: Partial<TextBufferConfig>;
+  uncommentedBuffer: Partial<TextBufferConfig>;
+}>;
+
 export type ApiKeys = {
   openai: string;
   google: string;
@@ -34,4 +42,3 @@ export const defaultUncommentedBufferConfig: TextBufferConfig = {
 export { defaultCommentGeneratorConfig } from "./comment-gen/index.js";
 export { defaultDecisionEngineConfig } from "./decision-engine/index.js";
 export { defaultEventDetectorConfig } from "./event-detector/index.js";
-export { defaultTextBufferConfig } from "./text-buffer/index.js";
