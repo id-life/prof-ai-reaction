@@ -1,3 +1,5 @@
+import { getLogger } from "@logtape/logtape";
+import { delay } from "@std/async";
 import { createNanoEvents } from "nanoevents";
 import { nanoid } from "nanoid";
 import { generateComment } from "./comment-gen/index.js";
@@ -23,13 +25,12 @@ import type { Comment, Event, Turn } from "./type.js";
 
 export interface CommentSystemEvents {
   "comment-generated": (comment: Comment) => void;
-  error: (error: Error) => void;
+  error: (error: unknown) => void;
 }
 
 interface CommentSystemOptions {
   config?: ConfigInput;
   apiKeys: ApiKeys;
-  debug?: boolean;
 }
 
 export class CommentSystem implements Disposable {
@@ -41,9 +42,10 @@ export class CommentSystem implements Disposable {
   private detectionQueue: EventDetectionQueue;
   private config: Config;
   private apiKeys: ApiKeys;
-  private pendingComment: NodeJS.Timeout | number | null = null;
+  private pendingComment: AbortController | null = null;
   private emitter = createNanoEvents<CommentSystemEvents>();
   private static readonly MAX_TURN_STALENESS_MS = 5000; // Drop turns older than this
+  private logger = getLogger(["ai-reaction", "comment-system"]);
 
   on<E extends keyof CommentSystemEvents>(
     event: E,
@@ -91,6 +93,14 @@ export class CommentSystem implements Disposable {
       this.config.shortTurnAggregator,
     );
     this.shortTurnAggregator.on("timeout", (bufferedTurn) => {
+      this.logger.debug("Short turn aggregator timeout triggered", () => ({
+        turnId: bufferedTurn.id,
+        turnContent: bufferedTurn.content.substring(0, 100),
+        startTime: bufferedTurn.startTime,
+        endTime: bufferedTurn.endTime,
+        duration: bufferedTurn.endTime - bufferedTurn.startTime,
+      }));
+
       // Enqueue using current buffers' snapshots
       this.detectionQueue.enqueue({
         turn: bufferedTurn,
@@ -107,19 +117,43 @@ export class CommentSystem implements Disposable {
 
     this.detectionQueue = new EventDetectionQueue({
       process: async (job) => {
-        // console.log("[detection-queue] processing job", job);
+        this.logger.debug("Processing detection job", () => ({
+          jobTurnId: job.turn.id,
+          turnContent: job.turn.content.substring(0, 50),
+          enqueuedAtMs: job.enqueuedAtMs,
+          queueDelayMs: Date.now() - job.enqueuedAtMs,
+          fullContextLength: job.fullContext?.length,
+          uncommentedTextLength: job.uncommentedText?.length,
+        }));
         await this.processJob(job);
       },
       isStale: (job) => {
-        // console.log("[detection-queue] checking if job is stale", job);
-        return this.isTurnStale(job.turn, job.enqueuedAtMs);
+        const stale = this.isTurnStale(job.turn, job.enqueuedAtMs);
+        this.logger.debug("Staleness check for job", () => ({
+          jobTurnId: job.turn.id,
+          enqueuedAtMs: job.enqueuedAtMs,
+          ageMs: Date.now() - job.enqueuedAtMs,
+          maxStaleMs: CommentSystem.MAX_TURN_STALENESS_MS,
+          stale,
+        }));
+        return stale;
       },
-      onDropStale: () =>
-        this.debug("[detection-queue] dropped stale queued turn"),
+      onDropStale: (job) =>
+        this.logger.info("Dropped stale queued turn", {
+          jobTurnId: job.turn.id,
+          enqueuedAtMs: job.enqueuedAtMs,
+          ageMs: Date.now() - job.enqueuedAtMs,
+        }),
     });
     this.detectionQueue.on("error", (error, job) => {
-      console.error("[detection-queue] error", error, job.turn.id);
-      this.handleError(error);
+      this.logger.error("Detection queue error: {message}", {
+        error: error,
+        message: error.message,
+        jobTurnId: job.turn.id,
+        enqueuedAtMs: job.enqueuedAtMs,
+        queueDelayMs: Date.now() - job.enqueuedAtMs,
+      });
+      this.emitter.emit("error", error);
     });
   }
 
@@ -134,23 +168,60 @@ export class CommentSystem implements Disposable {
       endTime: data.endTime,
     };
 
+    this.logger.debug("Turn completed", () => ({
+      turnId: turn.id,
+      contentLength: turn.content?.length ?? 0,
+      duration: turn.endTime - turn.startTime,
+      contentPreview: turn.content?.substring(0, 50) ?? "",
+    }));
+
     // Always append incoming turns to buffers immediately
     this.fullContextBuffer.append(turn);
     this.uncommentedBuffer.append(turn);
+
+    this.logger.trace("Updated buffers with turn", () => ({
+      turnId: turn.id,
+      fullContextStats: this.fullContextBuffer.getStatistics(),
+      uncommentedStats: this.uncommentedBuffer.getStatistics(),
+    }));
 
     // Gate by minimal turn duration via aggregator
     const minDuration = this.config.shortTurnAggregator.minTurnDurationMs;
     let readyTurn: Turn | null = null;
     // Convert seconds to milliseconds for comparison against ms config
-    if ((turn.endTime - turn.startTime) * 1000 >= minDuration) {
+    const turnDurationMs = (turn.endTime - turn.startTime) * 1000;
+
+    if (turnDurationMs >= minDuration) {
       // Long enough by duration; also reset any pending aggregation
+      this.logger.debug("Turn meets minimum duration threshold", {
+        turnId: turn.id,
+        durationMs: turnDurationMs,
+        minDurationMs: minDuration,
+      });
       this.shortTurnAggregator.clear();
       readyTurn = turn;
     } else {
+      this.logger.trace("Turn too short, adding to aggregator", {
+        turnId: turn.id,
+        durationMs: turnDurationMs,
+        minDurationMs: minDuration,
+      });
       readyTurn = this.shortTurnAggregator.add(turn);
     }
 
-    if (!readyTurn) return; // Not ready yet
+    if (!readyTurn) {
+      this.logger.trace("No ready turn after aggregation, waiting", {
+        originalTurnId: turn.id,
+      });
+      return; // Not ready yet
+    }
+
+    this.logger.debug("Enqueueing detection job", () => ({
+      readyTurnId: readyTurn!.id,
+      contentLength: readyTurn!.content?.length ?? 0,
+      fullContextLength: this.fullContextBuffer.getWindow().length,
+      uncommentedTextLength: this.uncommentedBuffer.getWindow().length,
+    }));
 
     // Enqueue detection job; queue handles prefer-latest and staleness
     this.detectionQueue.enqueue({
@@ -169,42 +240,82 @@ export class CommentSystem implements Disposable {
 
   private async processJob(job: DetectionJob): Promise<void> {
     // Drop if too delayed
-    // this.debug(
-    //   "[detection-queue] processing job",
-    //   job.turn.id,
-    //   job.enqueuedAtMs,
-    //   this.isTurnStale(job.turn, job.enqueuedAtMs),
-    // );
     if (this.isTurnStale(job.turn, job.enqueuedAtMs)) {
-      this.debug("Turn too stale, dropping");
+      this.logger.info("Turn too stale, dropping", () => ({
+        jobTurnId: job.turn.id,
+        enqueuedAtMs: job.enqueuedAtMs,
+      }));
       return;
     }
-    this.debug("[detect] Detecting events", job.turn);
+    this.logger.debug("Starting event detection", () => ({
+      turnId: job.turn.id,
+      contentLength: job.turn.content?.length ?? 0,
+      endTime: job.turn.endTime,
+      fullContextLength: job.fullContext?.length,
+      uncommentedTextLength: job.uncommentedText?.length,
+    }));
+
+    const detectionStart = performance.now();
     const events = await this.eventDetector.detect(job);
-    this.debug(
-      `[detect] Detected ${events.length} events:`,
-      JSON.stringify(events, null, 2),
-    );
+    const detectionTimeMs = performance.now() - detectionStart;
+
+    this.logger.info("Event detection completed", {
+      turnId: job.turn.id,
+      eventsDetected: events.length,
+      detectionTimeMs: Math.round(detectionTimeMs),
+      eventTypes: events.map((e) => e.type),
+      avgConfidence:
+        events.length > 0
+          ? (
+              events.reduce((sum, e) => sum + e.confidence, 0) / events.length
+            ).toFixed(2)
+          : 0,
+    });
 
     // Make decision
+    const decisionStart = performance.now();
     const decision = this.decisionEngine.evaluate(events, job.turn.endTime);
-    this.debug(
-      `[decision] ${decision.shouldComment ? "YES" : "NO"} (score: ${decision.score.toFixed(2)})`,
-    );
+    const decisionTimeMs = performance.now() - decisionStart;
+
+    this.logger.info("Decision: {decision}", {
+      decision: decision.shouldComment ? "COMMENT" : "SKIP",
+      score: parseFloat(decision.score.toFixed(2)),
+      confidence: parseFloat(decision.confidence.toFixed(2)),
+      priority: decision.priority,
+      suggestedDelayMs: decision.suggestedDelay,
+      reasoning: decision.reasoning,
+      factors: decision.factors,
+      decisionTimeMs: Math.round(decisionTimeMs),
+      turnId: job.turn.id,
+    });
 
     // Generate comment if decided
     if (decision.shouldComment) {
       // Cancel any pending comment
       if (this.pendingComment) {
-        clearTimeout(this.pendingComment);
+        this.logger.debug("Cancelling previous pending comment", {
+          turnId: job.turn.id,
+        });
+        this.pendingComment.abort();
         this.pendingComment = null;
       }
 
+      this.logger.info("Scheduling comment generation", {
+        turnId: job.turn.id,
+        delayMs: decision.suggestedDelay,
+        priority: decision.priority,
+      });
+
       // Schedule comment generation with suggested delay
-      this.pendingComment = setTimeout(async () => {
+      this.pendingComment = new AbortController();
+      try {
+        await delay(decision.suggestedDelay, {
+          signal: this.pendingComment.signal,
+        });
         await this.generateAndEmitComment(job.turn, events);
+      } finally {
         this.pendingComment = null;
-      }, decision.suggestedDelay);
+      }
     }
   }
 
@@ -229,7 +340,14 @@ export class CommentSystem implements Disposable {
 
       const startCommentTime = performance.now();
 
-      this.debug("[comment-gen] Generating comment", context);
+      this.logger.info("Starting comment generation", () => ({
+        turnId: turn.id,
+        currentTextLength: context.currentText.length,
+        historicalTextLength: context.historicalText.length,
+        uncommentedTextLength: context.uncommentedText.length,
+        events: events.map((e) => ({ type: e.type, confidence: e.confidence })),
+        eventCount: events.length,
+      }));
 
       const commentResponse = await generateComment(context, {
         ...this.config.commentGenerator,
@@ -239,23 +357,30 @@ export class CommentSystem implements Disposable {
 
       // for await (const chunk of commentResponse) {
       //   if (chunk.type === "agent_updated_stream_event") {
-      //     this.debug(`Agent updated: ${chunk.agent.name}`);
+      //     this.logger.debug(`Agent updated: ${chunk.agent.name}`);
       //   } else if (chunk.type === "run_item_stream_event") {
-      //     this.debug(`Run item: ${chunk.name}, ${JSON.stringify(chunk.item.toJSON())}`);
+      //     this.logger.debug(`Run item: ${chunk.name}, ${JSON.stringify(chunk.item.toJSON())}`);
       //   } else if (chunk.type === "raw_model_stream_event") {
-      //     this.debug(`Raw model: ${JSON.stringify(chunk.data)}`);
+      //     this.logger.debug(`Raw model: ${JSON.stringify(chunk.data)}`);
       //   }
       // }
       await commentResponse.completed;
       const commentResult = commentResponse.finalOutput!;
 
       if (commentResult.reject) {
-        this.debug(`Comment rejected: ${commentResult.reason}`);
+        this.logger.warn("Comment rejected by generator", {
+          reason: commentResult.reason,
+          turnId: turn.id,
+          generationTimeMs: Math.round(performance.now() - startCommentTime),
+        });
         return;
       }
 
       if (!commentResult.content) {
-        this.debug(`Comment is empty`);
+        this.logger.warn("Comment generation produced empty content", {
+          turnId: turn.id,
+          generationTimeMs: Math.round(performance.now() - startCommentTime),
+        });
         return;
       }
 
@@ -279,9 +404,18 @@ export class CommentSystem implements Disposable {
       // Emit comment
       this.emitter.emit("comment-generated", comment);
 
-      this.debug(`Generated comment: "${comment.content}"`);
+      this.logger.info("Comment generated successfully", () => ({
+        commentId: comment.id,
+        writer: comment.writer,
+        length: comment.length,
+        generationTimeMs: Math.round(comment.generationTime),
+        timestamp: comment.metadata?.timestamp,
+        turnId: turn.id,
+        contentPreview: comment.content.substring(0, 100),
+        bufferStatsBeforeReset: this.uncommentedBuffer.getStatistics(),
+      }));
     } catch (error) {
-      this.handleError(error as Error);
+      this.emitter.emit("error", error);
     }
   }
 
@@ -304,7 +438,7 @@ export class CommentSystem implements Disposable {
     this.uncommentedBuffer.clear();
     this.shortTurnAggregator.clear();
     if (this.pendingComment) {
-      clearTimeout(this.pendingComment);
+      this.pendingComment.abort();
       this.pendingComment = null;
     }
   }
@@ -314,17 +448,6 @@ export class CommentSystem implements Disposable {
    */
   [Symbol.dispose](): void {
     this.clear();
-  }
-
-  private debug(...args: unknown[]): void {
-    if (this.options.debug) {
-      console.log("[CommentSystem]", ...args);
-    }
-  }
-
-  private handleError(error: Error): void {
-    this.debug("Error:", error);
-    this.emitter.emit("error", error);
   }
 }
 

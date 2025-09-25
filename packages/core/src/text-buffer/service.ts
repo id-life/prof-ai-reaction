@@ -1,3 +1,4 @@
+import { getLogger } from "@logtape/logtape";
 import { createNanoEvents } from "nanoevents";
 import type { TextSegment, Turn } from "../type.js";
 import type {
@@ -9,6 +10,7 @@ import type {
 export class TextBuffer {
   private segments: TextSegment[] = [];
   private position = 0;
+  private logger = getLogger(["ai-reaction", "text-buffer"]);
 
   constructor(private config: TextBufferConfig) {}
 
@@ -20,16 +22,37 @@ export class TextBuffer {
     };
 
     this.segments.push(segment);
+
+    this.logger.trace("Appended turn to buffer", () => ({
+      turnId: turn.id,
+      contentLength: turn.content?.length ?? 0,
+      timestamp: turn.endTime,
+      position: segment.position,
+      totalSegments: this.segments.length,
+      bufferSizeCharacters: this.segments.reduce((sum, s) => sum + s.content.length, 0),
+    }));
   }
 
   getWindow(size: number = this.config.windowDuration): string {
     const now = this.segments[this.segments.length - 1]?.timestamp || 0;
     const cutoff = now - size * 1000;
 
-    return this.segments
-      .filter((s) => s.timestamp >= cutoff)
-      .map((s) => s.content)
-      .join(" ");
+    const filteredSegments = this.segments.filter((s) => s.timestamp >= cutoff);
+    const windowText = filteredSegments.map((s) => s.content).join(" ");
+
+    this.logger.trace("Retrieved window", () => ({
+      requestedSizeSeconds: size,
+      actualSizeSeconds: filteredSegments.length > 0
+        ? (now - filteredSegments[0].timestamp) / 1000
+        : 0,
+      totalSegments: this.segments.length,
+      windowSegments: filteredSegments.length,
+      windowCharacters: windowText.length,
+      cutoffTimestamp: cutoff,
+      nowTimestamp: now,
+    }));
+
+    return windowText;
   }
 
   getRange(start: number, end: number): string {
@@ -48,10 +71,18 @@ export class TextBuffer {
     pattern: string,
     limit = 10,
   ): Array<{ content: string; timestamp: number }> {
+    this.logger.debug("Starting buffer search", {
+      pattern,
+      limit,
+      totalSegments: this.segments.length,
+    });
+
     const results: Array<{ content: string; timestamp: number }> = [];
     const regex = new RegExp(pattern, "gi");
+    let segmentsSearched = 0;
 
     for (const segment of this.segments.slice().reverse()) {
+      segmentsSearched++;
       if (regex.test(segment.content)) {
         results.push({
           content: segment.content,
@@ -61,12 +92,28 @@ export class TextBuffer {
       }
     }
 
+    this.logger.debug("Buffer search completed", {
+      pattern,
+      resultsFound: results.length,
+      segmentsSearched,
+      totalSegments: this.segments.length,
+      limitReached: results.length >= limit,
+    });
+
     return results;
   }
 
   clear(): void {
+    const beforeStats = this.getStatistics();
     this.segments = [];
     this.position = 0;
+
+    this.logger.debug("Buffer cleared", {
+      previousSegmentCount: beforeStats.segmentCount,
+      previousTotalCharacters: beforeStats.totalCharacters,
+      previousOldestTimestamp: beforeStats.oldestTimestamp,
+      previousNewestTimestamp: beforeStats.newestTimestamp,
+    });
   }
 
   getStatistics(): BufferStats {
@@ -95,7 +142,16 @@ export class TextBuffer {
   }
 
   getRecentSegments(count: number): TextSegment[] {
-    return this.segments.slice(-count);
+    const recent = this.segments.slice(-count);
+
+    this.logger.trace("Retrieved recent segments", {
+      requestedCount: count,
+      actualCount: recent.length,
+      totalSegments: this.segments.length,
+      recentCharacters: recent.reduce((sum, s) => sum + s.content.length, 0),
+    });
+
+    return recent;
   }
 }
 
@@ -104,6 +160,7 @@ export interface ShortTurnAggregatorEvents {
 }
 
 export class ShortTurnAggregator implements Disposable {
+  private logger = getLogger(["ai-reaction", "short-turn-aggregator"]);
   private bufferedContent = "";
   private bufferedStartTime = 0;
   private lastTurnEndTime = 0;
@@ -138,17 +195,37 @@ export class ShortTurnAggregator implements Disposable {
     const tooFarFromPrevious =
       hasActiveBuffer && gapMs > this.config.aggregationMaxGapMs;
 
+    this.logger.trace("Adding turn to aggregator", () => ({
+      turnId: turn.id,
+      contentLength: content.length,
+      hasActiveBuffer,
+      gapMs,
+      maxGapMs: this.config.aggregationMaxGapMs,
+      tooFarFromPrevious,
+      currentBufferedLength: this.bufferedContent.length,
+      currentWordCount: this.aggregatedWordCount,
+    }));
+
     if (!hasActiveBuffer || tooFarFromPrevious) {
+      if (tooFarFromPrevious) {
+        this.logger.debug("Turn gap too large, resetting buffer", {
+          turnId: turn.id,
+          gapMs,
+          maxGapMs: this.config.aggregationMaxGapMs,
+        });
+      }
       this.resetBuffer();
       this.bufferedStartTime = turn.startTime;
     }
 
     // Append with a separating space if needed
+    const previousContentLength = this.bufferedContent.length;
     this.bufferedContent = this.bufferedContent
       ? `${this.bufferedContent} ${content}`
       : content;
 
     // Update word count
+    const previousWordCount = this.aggregatedWordCount;
     this.aggregatedWordCount = this.countWords(this.bufferedContent);
     this.lastTurnEndTime = turn.endTime;
 
@@ -158,18 +235,47 @@ export class ShortTurnAggregator implements Disposable {
         : 0;
 
     const durationReached =
-      this.bufferedStartTime > 0 &&
-      elapsedMs >= this.config.minTurnDurationMs;
+      this.bufferedStartTime > 0 && elapsedMs >= this.config.minTurnDurationMs;
 
     const maxWords = this.config.aggregationMaxWords ?? 0;
-    const wordLimitReached = maxWords > 0 && this.aggregatedWordCount >= maxWords;
+    const wordLimitReached =
+      maxWords > 0 && this.aggregatedWordCount >= maxWords;
 
     const maxTotalDuration = this.config.aggregationMaxTotalDurationMs ?? 0;
     const totalDurationExceeded =
       maxTotalDuration > 0 && elapsedMs >= maxTotalDuration;
 
+    this.logger.trace("Updated aggregator state", () => ({
+      turnId: turn.id,
+      bufferedContentLength: this.bufferedContent.length,
+      contentLengthChange: this.bufferedContent.length - previousContentLength,
+      wordCount: this.aggregatedWordCount,
+      wordCountChange: this.aggregatedWordCount - previousWordCount,
+      elapsedMs,
+      thresholds: {
+        durationReached: { value: durationReached, threshold: this.config.minTurnDurationMs },
+        wordLimitReached: { value: wordLimitReached, threshold: maxWords },
+        totalDurationExceeded: { value: totalDurationExceeded, threshold: maxTotalDuration },
+      },
+    }));
+
     // If any threshold reached, emit immediately and clear
     if (durationReached || wordLimitReached || totalDurationExceeded) {
+      const reasons = [];
+      if (durationReached) reasons.push("duration");
+      if (wordLimitReached) reasons.push("word limit");
+      if (totalDurationExceeded) reasons.push("total duration");
+
+      this.logger.debug("Aggregation threshold reached, emitting turn", {
+        triggerReasons: reasons,
+        aggregatedTurnId: turn.id,
+        finalContentLength: this.bufferedContent.length,
+        finalWordCount: this.aggregatedWordCount,
+        totalElapsedMs: elapsedMs,
+        bufferedFromStartTime: this.bufferedStartTime,
+        bufferedToEndTime: this.lastTurnEndTime,
+      });
+
       const aggregated: Turn = {
         id: turn.id,
         content: this.bufferedContent,
@@ -185,10 +291,26 @@ export class ShortTurnAggregator implements Disposable {
     this.clearTimeout();
     this.timeoutHandle = setTimeout(() => {
       const pending = this.peek();
-      if (pending) this.emitter.emit("timeout", pending);
+      if (pending) {
+        this.logger.debug("Aggregation timeout reached, emitting buffered turn", {
+          turnId: pending.id,
+          bufferedContent: pending.content.substring(0, 100),
+          wordCount: this.aggregatedWordCount,
+          elapsedMs: (pending.endTime - pending.startTime) * 1000,
+          timeoutMs: this.config.aggregationMaxDelayMs,
+        });
+        this.emitter.emit("timeout", pending);
+      }
       this.clearTimeout();
       this.resetBuffer();
     }, this.config.aggregationMaxDelayMs);
+
+    this.logger.trace("Scheduled aggregation timeout", {
+      turnId: turn.id,
+      delayMs: this.config.aggregationMaxDelayMs,
+      bufferedContentLength: this.bufferedContent.length,
+      wordCount: this.aggregatedWordCount,
+    });
 
     return null;
   }
@@ -213,19 +335,42 @@ export class ShortTurnAggregator implements Disposable {
 
   /** Force flush (if any) even if below threshold; returns turn or null */
   flush(): Turn | null {
-    if (!this.bufferedContent) return null;
+    if (!this.bufferedContent) {
+      this.logger.trace("Flush called but no buffered content");
+      return null;
+    }
+
     const turn: Turn = {
       id: `${this.bufferedStartTime}`,
       content: this.bufferedContent,
       startTime: this.bufferedStartTime,
       endTime: this.lastTurnEndTime,
     };
+
+    this.logger.debug("Flushing buffered turn", {
+      turnId: turn.id,
+      contentLength: turn.content.length,
+      wordCount: this.aggregatedWordCount,
+      elapsedMs: (turn.endTime - turn.startTime) * 1000,
+      wasForced: true,
+    });
+
     this.clearTimeout();
     this.resetBuffer();
     return turn;
   }
 
   clear(): void {
+    const hadContent = this.bufferedContent.length > 0;
+    if (hadContent) {
+      this.logger.debug("Clearing aggregator", {
+        discardedContentLength: this.bufferedContent.length,
+        discardedWordCount: this.aggregatedWordCount,
+        elapsedMs: this.bufferedStartTime > 0 && this.lastTurnEndTime > 0
+          ? (this.lastTurnEndTime - this.bufferedStartTime) * 1000
+          : 0,
+      });
+    }
     this.clearTimeout();
     this.resetBuffer();
   }
@@ -238,6 +383,7 @@ export class ShortTurnAggregator implements Disposable {
     this.bufferedStartTime = 0;
     this.lastTurnEndTime = 0;
     this.aggregatedWordCount = 0;
+    this.logger.trace("Buffer reset");
   }
 
   private clearTimeout(): void {
@@ -252,11 +398,14 @@ export class ShortTurnAggregator implements Disposable {
     // If Segmenter is available, count segments marked as words
     if (this.segmenter) {
       type WordSegment = { segment: string; isWordLike?: boolean };
-      const iterable = this.segmenter.segment(text) as unknown as Iterable<WordSegment>;
+      const iterable = this.segmenter.segment(
+        text,
+      ) as unknown as Iterable<WordSegment>;
       let count = 0;
       for (const seg of iterable) {
         const segText: string = seg.segment;
-        const isWordLike: boolean = seg.isWordLike ?? /[\p{L}\p{N}]/u.test(segText);
+        const isWordLike: boolean =
+          seg.isWordLike ?? /[\p{L}\p{N}]/u.test(segText);
         if (isWordLike) count++;
       }
       return count;
@@ -264,8 +413,14 @@ export class ShortTurnAggregator implements Disposable {
     // Fallback: Unicode-aware counting
     // - Count individual CJK characters
     // - Count contiguous sequences of letters/numbers for non-CJK
-    const cjkMatches = text.match(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu) || [];
-    const nonCjk = text.replace(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu, " ");
+    const cjkMatches =
+      text.match(
+        /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu,
+      ) || [];
+    const nonCjk = text.replace(
+      /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu,
+      " ",
+    );
     const latinWordMatches = nonCjk.match(/[\p{L}\p{N}]+/gu) || [];
     return cjkMatches.length + latinWordMatches.length;
   }

@@ -124,7 +124,6 @@ export async function main(input: string) {
         ],
       },
     },
-    debug: true,
   });
 
   player.on("cue-end", (cue) => {
