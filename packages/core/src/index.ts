@@ -11,6 +11,10 @@ export {
   type EventDetectorConfig,
   EventDetectorConfigSchema,
 } from "./event-detector/index.js";
-export { CommentSystem, createCommentSystem } from "./system.js";
+export {
+  CommentSystem,
+  type CommentSystemEvents,
+  createCommentSystem,
+} from "./system.js";
 export type { TextBufferConfig } from "./text-buffer/index.js";
 export type { Comment, Event, Turn } from "./type.js";

@@ -1,3 +1,4 @@
+import { createNanoEvents } from "nanoevents";
 import { nanoid } from "nanoid";
 import { generateComment } from "./comment-gen/index.js";
 import {
@@ -16,27 +17,39 @@ import {
   EventDetectionQueue,
   EventDetector,
 } from "./event-detector/index.js";
-import { TextBuffer } from "./text-buffer/service.js";
+import { ShortTurnAggregator, TextBuffer } from "./text-buffer/service.js";
 import type { Comment, Event, Turn } from "./type.js";
+
+export interface CommentSystemEvents {
+  "comment-generated": (comment: Comment) => void;
+  error: (error: Error) => void;
+}
 
 interface CommentSystemOptions {
   config?: ConfigInput;
   apiKeys: ApiKeys;
-  onComment?: (comment: Comment) => void;
-  onError?: (error: Error) => void;
   debug?: boolean;
 }
 
 export class CommentSystem implements Disposable {
   private fullContextBuffer: TextBuffer; // Stores entire conversation
   private uncommentedBuffer: TextBuffer; // Stores only uncommented portions
+  private shortTurnAggregator: ShortTurnAggregator; // Aggregates nearby short turns
   private eventDetector: EventDetector;
   private decisionEngine: DecisionEngine;
   private detectionQueue: EventDetectionQueue;
   private config: Config;
   private apiKeys: ApiKeys;
   private pendingComment: NodeJS.Timeout | number | null = null;
+  private emitter = createNanoEvents<CommentSystemEvents>();
   private static readonly MAX_TURN_STALENESS_MS = 5000; // Drop turns older than this
+
+  on<E extends keyof CommentSystemEvents>(
+    event: E,
+    listener: CommentSystemEvents[E],
+  ): void {
+    this.emitter.on(event, listener);
+  }
 
   constructor(private options: CommentSystemOptions) {
     this.config = {
@@ -69,6 +82,17 @@ export class CommentSystem implements Disposable {
 
     // Uncommented buffer resets after each comment
     this.uncommentedBuffer = new TextBuffer(this.config.uncommentedBuffer);
+    this.shortTurnAggregator = new ShortTurnAggregator(
+      this.config.uncommentedBuffer,
+    );
+    this.shortTurnAggregator.on("timeout", (bufferedTurn) => {
+      // Enqueue using current buffers' snapshots
+      this.detectionQueue.enqueue({
+        turn: bufferedTurn,
+        fullContext: this.fullContextBuffer.getWindow(),
+        uncommentedText: this.uncommentedBuffer.getWindow(),
+      });
+    });
 
     this.eventDetector = new EventDetector(
       this.config.eventDetector,
@@ -86,12 +110,7 @@ export class CommentSystem implements Disposable {
   /**
    * Process a completed turn and potentially generate a comment
    */
-  async onTurnCompleted(data: {
-    id: string;
-    content: string;
-    startTime: number;
-    endTime: number;
-  }): Promise<void> {
+  onTurnCompleted(data: Turn): void {
     const turn: Turn = {
       id: data.id,
       content: data.content,
@@ -103,9 +122,22 @@ export class CommentSystem implements Disposable {
     this.fullContextBuffer.append(turn);
     this.uncommentedBuffer.append(turn);
 
+    // Gate by minimal turn duration via aggregator
+    const minDuration = this.config.uncommentedBuffer.minTurnDurationMs;
+    let readyTurn: Turn | null = null;
+    if (turn.endTime - turn.startTime >= minDuration) {
+      // Long enough by duration; also reset any pending aggregation
+      this.shortTurnAggregator.clear();
+      readyTurn = turn;
+    } else {
+      readyTurn = this.shortTurnAggregator.add(turn);
+    }
+
+    if (!readyTurn) return; // Not ready yet
+
     // Enqueue detection job; queue handles prefer-latest and staleness
     this.detectionQueue.enqueue({
-      turn,
+      turn: readyTurn,
       fullContext: this.fullContextBuffer.getWindow(),
       uncommentedText: this.uncommentedBuffer.getWindow(),
     });
@@ -231,7 +263,7 @@ export class CommentSystem implements Disposable {
       this.uncommentedBuffer.clear();
 
       // Emit comment
-      this.options.onComment?.(comment);
+      this.emitter.emit("comment-generated", comment);
 
       this.debug(`Generated comment: "${comment.content}"`);
     } catch (error) {
@@ -256,6 +288,7 @@ export class CommentSystem implements Disposable {
   clear(): void {
     this.fullContextBuffer.clear();
     this.uncommentedBuffer.clear();
+    this.shortTurnAggregator.clear();
     if (this.pendingComment) {
       clearTimeout(this.pendingComment);
       this.pendingComment = null;
@@ -277,9 +310,7 @@ export class CommentSystem implements Disposable {
 
   private handleError(error: Error): void {
     this.debug("Error:", error);
-    if (this.options.onError) {
-      this.options.onError(error);
-    }
+    this.emitter.emit("error", error);
   }
 }
 
