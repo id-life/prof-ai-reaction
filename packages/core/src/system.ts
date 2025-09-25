@@ -24,6 +24,10 @@ import { ShortTurnAggregator, TextBuffer } from "./text-buffer/service.js";
 import type { Comment, Event, Turn } from "./type.js";
 
 export interface CommentSystemEvents {
+  "comment-started": (
+    response: Awaited<ReturnType<typeof generateComment>>,
+  ) => void;
+  "comment-rejected": (reason: string) => void;
   "comment-generated": (comment: Comment) => void;
   error: (error: unknown) => void;
 }
@@ -355,6 +359,8 @@ export class CommentSystem implements Disposable {
         // signal:
       });
 
+      this.emitter.emit("comment-started", commentResponse);
+
       // for await (const chunk of commentResponse) {
       //   if (chunk.type === "agent_updated_stream_event") {
       //     this.logger.debug(`Agent updated: ${chunk.agent.name}`);
@@ -373,6 +379,7 @@ export class CommentSystem implements Disposable {
           turnId: turn.id,
           generationTimeMs: Math.round(performance.now() - startCommentTime),
         });
+        this.emitter.emit("comment-rejected", commentResult.reason);
         return;
       }
 
