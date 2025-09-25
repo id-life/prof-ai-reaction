@@ -3,8 +3,10 @@ import z from "zod";
 export interface Turn {
   id: string;
   content: string;
-  startTime: number; // NPT timestamp
-  endTime: number; // NPT timestamp
+  /** normal playback time in seconds */
+  startTime: number; 
+  /** normal playback time in seconds */
+  endTime: number; 
 }
 
 export interface TextSegment {

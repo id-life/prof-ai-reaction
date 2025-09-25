@@ -154,7 +154,8 @@ export const defaultEventDetectorConfig: EventDetectorConfig = {
   detectionSensitivity: 0.7,
   emotionThreshold: 0.75,
   topicTransitionThreshold: 0.3,
-  keypointDensityThreshold: 5,
+  // Use 0-1 scale for intensity thresholds; 0.5 is a balanced default
+  keypointDensityThreshold: 0.5,
   modelProvider: "openai",
   model: "gpt-5-nano",
 };

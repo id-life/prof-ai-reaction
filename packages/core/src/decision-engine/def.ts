@@ -42,9 +42,9 @@ export const DecisionEngineConfigSchema = z.object({
 });
 
 export const defaultDecisionEngineConfig: DecisionEngineConfig = {
-  baseThreshold: 0.65, // Increased to reduce comment frequency
-  minInterval: 20, // Increased minimum interval between comments
-  maxInterval: 90, // Increased maximum interval
+  baseThreshold: 0.65,
+  minInterval: 20,
+  maxInterval: 90,
   emotionWeight: 0.2,
   topicWeight: 0.4,
   timingWeight: 0.15,

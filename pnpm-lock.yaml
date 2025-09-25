@@ -88,6 +88,9 @@ importers:
       media-captions:
         specifier: ^0.0.18
         version: 0.0.18
+      nanoevents:
+        specifier: ^9.1.0
+        version: 9.1.0
 
 packages:
 

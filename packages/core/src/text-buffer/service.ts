@@ -1,6 +1,10 @@
 import { createNanoEvents } from "nanoevents";
 import type { TextSegment, Turn } from "../type.js";
-import type { BufferStats, TextBufferConfig } from "./def.js";
+import type {
+  BufferStats,
+  ShortTurnAggregationConfig,
+  TextBufferConfig,
+} from "./def.js";
 
 export class TextBuffer {
   private segments: TextSegment[] = [];
@@ -105,8 +109,18 @@ export class ShortTurnAggregator implements Disposable {
   private lastTurnEndTime = 0;
   private timeoutHandle: number | NodeJS.Timeout | null = null;
   private emitter = createNanoEvents<ShortTurnAggregatorEvents>();
+  private segmenter: Intl.Segmenter | null = null;
+  private aggregatedWordCount = 0;
 
-  constructor(private config: TextBufferConfig) {}
+  constructor(private config: ShortTurnAggregationConfig) {
+    // Try to construct a word segmenter; fall back gracefully
+    try {
+      // Use "word" granularity; locale-agnostic by default
+      this.segmenter = new Intl.Segmenter(undefined, { granularity: "word" });
+    } catch {
+      this.segmenter = null;
+    }
+  }
 
   /**
    * Add a turn; returns an aggregated synthetic turn when threshold met or timeout previously fired.
@@ -117,9 +131,12 @@ export class ShortTurnAggregator implements Disposable {
 
     // If there is no active buffer, start one.
     const hasActiveBuffer = this.bufferedContent.length > 0;
+    // Convert media-relative seconds to milliseconds when comparing against ms config
+    const gapMs = hasActiveBuffer
+      ? (turn.startTime - this.lastTurnEndTime) * 1000
+      : 0;
     const tooFarFromPrevious =
-      hasActiveBuffer &&
-      turn.startTime - this.lastTurnEndTime > this.config.aggregationMaxGapMs;
+      hasActiveBuffer && gapMs > this.config.aggregationMaxGapMs;
 
     if (!hasActiveBuffer || tooFarFromPrevious) {
       this.resetBuffer();
@@ -130,14 +147,29 @@ export class ShortTurnAggregator implements Disposable {
     this.bufferedContent = this.bufferedContent
       ? `${this.bufferedContent} ${content}`
       : content;
+
+    // Update word count
+    this.aggregatedWordCount = this.countWords(this.bufferedContent);
     this.lastTurnEndTime = turn.endTime;
 
-    // If duration threshold reached, emit immediately and clear
-    if (
+    const elapsedMs =
+      this.bufferedStartTime > 0
+        ? (this.lastTurnEndTime - this.bufferedStartTime) * 1000
+        : 0;
+
+    const durationReached =
       this.bufferedStartTime > 0 &&
-      this.lastTurnEndTime - this.bufferedStartTime >=
-        this.config.minTurnDurationMs
-    ) {
+      elapsedMs >= this.config.minTurnDurationMs;
+
+    const maxWords = this.config.aggregationMaxWords ?? 0;
+    const wordLimitReached = maxWords > 0 && this.aggregatedWordCount >= maxWords;
+
+    const maxTotalDuration = this.config.aggregationMaxTotalDurationMs ?? 0;
+    const totalDurationExceeded =
+      maxTotalDuration > 0 && elapsedMs >= maxTotalDuration;
+
+    // If any threshold reached, emit immediately and clear
+    if (durationReached || wordLimitReached || totalDurationExceeded) {
       const aggregated: Turn = {
         id: turn.id,
         content: this.bufferedContent,
@@ -149,15 +181,14 @@ export class ShortTurnAggregator implements Disposable {
       return aggregated;
     }
 
-    // Otherwise schedule a timeout if not already scheduled
-    if (!this.timeoutHandle) {
-      this.timeoutHandle = setTimeout(() => {
-        const pending = this.peek();
-        if (pending) this.emitter.emit("timeout", pending);
-        this.clearTimeout();
-        this.resetBuffer();
-      }, this.config.aggregationMaxDelayMs);
-    }
+    // Otherwise schedule (or reschedule) a debounce timeout so we flush after inactivity
+    this.clearTimeout();
+    this.timeoutHandle = setTimeout(() => {
+      const pending = this.peek();
+      if (pending) this.emitter.emit("timeout", pending);
+      this.clearTimeout();
+      this.resetBuffer();
+    }, this.config.aggregationMaxDelayMs);
 
     return null;
   }
@@ -206,6 +237,7 @@ export class ShortTurnAggregator implements Disposable {
     this.bufferedContent = "";
     this.bufferedStartTime = 0;
     this.lastTurnEndTime = 0;
+    this.aggregatedWordCount = 0;
   }
 
   private clearTimeout(): void {
@@ -213,5 +245,28 @@ export class ShortTurnAggregator implements Disposable {
       clearTimeout(this.timeoutHandle);
       this.timeoutHandle = null;
     }
+  }
+
+  private countWords(text: string): number {
+    if (!text) return 0;
+    // If Segmenter is available, count segments marked as words
+    if (this.segmenter) {
+      type WordSegment = { segment: string; isWordLike?: boolean };
+      const iterable = this.segmenter.segment(text) as unknown as Iterable<WordSegment>;
+      let count = 0;
+      for (const seg of iterable) {
+        const segText: string = seg.segment;
+        const isWordLike: boolean = seg.isWordLike ?? /[\p{L}\p{N}]/u.test(segText);
+        if (isWordLike) count++;
+      }
+      return count;
+    }
+    // Fallback: Unicode-aware counting
+    // - Count individual CJK characters
+    // - Count contiguous sequences of letters/numbers for non-CJK
+    const cjkMatches = text.match(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu) || [];
+    const nonCjk = text.replace(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu, " ");
+    const latinWordMatches = nonCjk.match(/[\p{L}\p{N}]+/gu) || [];
+    return cjkMatches.length + latinWordMatches.length;
   }
 }

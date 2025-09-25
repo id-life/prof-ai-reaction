@@ -152,7 +152,7 @@ export class EventDetector {
       },
     });
 
-    console.debug("Gemini response:", response);
+    // console.debug("Gemini response:", response);
 
     const responseText = response.text;
     if (!responseText) {
@@ -200,7 +200,7 @@ export class EventDetector {
       { signal },
     );
 
-    console.debug("OpenAI response:", response);
+    // console.debug("OpenAI response:", response);
 
     const message = response.choices[0]?.message;
     if (message?.refusal) {

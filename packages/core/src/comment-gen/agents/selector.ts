@@ -20,6 +20,9 @@ export default function buildCommentGenerator({
   selectorModel?: string;
   selectorInstructions?: string;
 }) {
+  if (writers.length === 0) {
+    throw new Error("No writers provided");
+  }
   return Agent.create({
     name: "style-selector",
     instructions: [

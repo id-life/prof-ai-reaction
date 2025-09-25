@@ -1,9 +1,12 @@
+import { createNanoEvents } from "nanoevents";
 import type { Turn } from "../type.js";
 
 export interface DetectionJob {
   turn: Turn;
   uncommentedText: string;
   fullContext?: string;
+  /** Wall-clock timestamp (ms) when this job was enqueued. */
+  enqueuedAtMs: number;
 }
 
 type QueueOptions = {
@@ -12,6 +15,10 @@ type QueueOptions = {
   onDropStale?: (job: DetectionJob) => void;
 };
 
+export interface EventDetectionQueueEvents {
+  error: (error: Error, job: DetectionJob) => void;
+}
+
 /**
  * Single-slot in-memory queue that prefers the most recent job.
  * If multiple jobs are added while processing, only the last one is kept.
@@ -19,11 +26,20 @@ type QueueOptions = {
 export class EventDetectionQueue {
   private processing = false;
   private pendingJob: DetectionJob | null = null;
+  private emitter = createNanoEvents<EventDetectionQueueEvents>();
+
+  on<E extends keyof EventDetectionQueueEvents>(
+    event: E,
+    listener: EventDetectionQueueEvents[E],
+  ): void {
+    this.emitter.on(event, listener);
+  }
 
   constructor(private options: QueueOptions) {}
 
-  enqueue(job: DetectionJob): void {
-    this.pendingJob = job;
+  enqueue(job: Omit<DetectionJob, "enqueuedAtMs">): void {
+    const withTimestamp: DetectionJob = { ...job, enqueuedAtMs: Date.now() };
+    this.pendingJob = withTimestamp;
     // Fire-and-forget start
     void this.processNext();
   }
@@ -33,6 +49,10 @@ export class EventDetectionQueue {
   }
 
   private async processNext(): Promise<void> {
+    console.log("[event-detector] processing next", {
+      processing: this.processing,
+      pendingJob: this.pendingJob?.turn.id,
+    });
     if (this.processing) return;
     this.processing = true;
     try {
@@ -49,12 +69,12 @@ export class EventDetectionQueue {
           continue;
         }
 
-        await this.options.process(job);
+        await this.options.process(job).catch((err) => {
+          this.emitter.emit("error", err, job);
+        });
       }
     } finally {
       this.processing = false;
     }
   }
 }
-
-

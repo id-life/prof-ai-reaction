@@ -1,4 +1,8 @@
-export { type CommentGeneratorConfig, writers } from "./comment-gen/index.js";
+export {
+  type CommentGeneratorConfig,
+  generateComment,
+  writers,
+} from "./comment-gen/index.js";
 export type {
   ApiKeys,
   Config,
@@ -16,5 +20,8 @@ export {
   type CommentSystemEvents,
   createCommentSystem,
 } from "./system.js";
-export type { TextBufferConfig } from "./text-buffer/index.js";
+export type {
+  ShortTurnAggregationConfig,
+  TextBufferConfig,
+} from "./text-buffer/index.js";
 export type { Comment, Event, Turn } from "./type.js";

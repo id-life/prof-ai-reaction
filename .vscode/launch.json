@@ -1,0 +1,23 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Launch Program",
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "program": "${workspaceFolder}/packages/playground/main.ts",
+      "args": ["/Users/aidenlx/repo/mx-repo/apps/obsidian/test/mx-vault/UF8uR6Z6KLc.en.vtt"],
+      "runtimeArgs": ["--env-file=${workspaceFolder}/packages/playground/.env.local"],
+      "outFiles": [
+        "${workspaceFolder}/**/*.js"
+      ]
+    }
+  ]
+}

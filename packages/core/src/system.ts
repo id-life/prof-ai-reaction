@@ -17,6 +17,7 @@ import {
   EventDetectionQueue,
   EventDetector,
 } from "./event-detector/index.js";
+import { defaultShortTurnAggregationConfig } from "./text-buffer/def.js";
 import { ShortTurnAggregator, TextBuffer } from "./text-buffer/service.js";
 import type { Comment, Event, Turn } from "./type.js";
 
@@ -74,6 +75,10 @@ export class CommentSystem implements Disposable {
         ...defaultUncommentedBufferConfig,
         ...options.config?.uncommentedBuffer,
       },
+      shortTurnAggregator: {
+        ...defaultShortTurnAggregationConfig,
+        ...options.config?.shortTurnAggregator,
+      },
     };
     this.apiKeys = options.apiKeys;
     // Initialize components with separate buffers
@@ -83,7 +88,7 @@ export class CommentSystem implements Disposable {
     // Uncommented buffer resets after each comment
     this.uncommentedBuffer = new TextBuffer(this.config.uncommentedBuffer);
     this.shortTurnAggregator = new ShortTurnAggregator(
-      this.config.uncommentedBuffer,
+      this.config.shortTurnAggregator,
     );
     this.shortTurnAggregator.on("timeout", (bufferedTurn) => {
       // Enqueue using current buffers' snapshots
@@ -101,9 +106,20 @@ export class CommentSystem implements Disposable {
     this.decisionEngine = new DecisionEngine(this.config.decisionEngine);
 
     this.detectionQueue = new EventDetectionQueue({
-      process: async (job) => this.processJob(job),
-      isStale: (job) => this.isTurnStale(job.turn),
-      onDropStale: () => this.debug("Dropped stale queued turn"),
+      process: async (job) => {
+        // console.log("[detection-queue] processing job", job);
+        await this.processJob(job);
+      },
+      isStale: (job) => {
+        // console.log("[detection-queue] checking if job is stale", job);
+        return this.isTurnStale(job.turn, job.enqueuedAtMs);
+      },
+      onDropStale: () =>
+        this.debug("[detection-queue] dropped stale queued turn"),
+    });
+    this.detectionQueue.on("error", (error, job) => {
+      console.error("[detection-queue] error", error, job.turn.id);
+      this.handleError(error);
     });
   }
 
@@ -123,9 +139,10 @@ export class CommentSystem implements Disposable {
     this.uncommentedBuffer.append(turn);
 
     // Gate by minimal turn duration via aggregator
-    const minDuration = this.config.uncommentedBuffer.minTurnDurationMs;
+    const minDuration = this.config.shortTurnAggregator.minTurnDurationMs;
     let readyTurn: Turn | null = null;
-    if (turn.endTime - turn.startTime >= minDuration) {
+    // Convert seconds to milliseconds for comparison against ms config
+    if ((turn.endTime - turn.startTime) * 1000 >= minDuration) {
       // Long enough by duration; also reset any pending aggregation
       this.shortTurnAggregator.clear();
       readyTurn = turn;
@@ -143,56 +160,51 @@ export class CommentSystem implements Disposable {
     });
   }
 
-  private isTurnStale(turn: Turn): boolean {
-    return Date.now() - turn.endTime > CommentSystem.MAX_TURN_STALENESS_MS;
+  private isTurnStale(_turn: Turn, enqueuedAtMs?: number): boolean {
+    // Determine staleness based on wall-clock enqueue time only.
+    // Turn timestamps are media-relative (seconds) and are not comparable to epoch ms.
+    if (enqueuedAtMs === undefined) return false;
+    return Date.now() - enqueuedAtMs > CommentSystem.MAX_TURN_STALENESS_MS;
   }
 
   private async processJob(job: DetectionJob): Promise<void> {
     // Drop if too delayed
-    if (this.isTurnStale(job.turn)) {
+    // this.debug(
+    //   "[detection-queue] processing job",
+    //   job.turn.id,
+    //   job.enqueuedAtMs,
+    //   this.isTurnStale(job.turn, job.enqueuedAtMs),
+    // );
+    if (this.isTurnStale(job.turn, job.enqueuedAtMs)) {
       this.debug("Turn too stale, dropping");
       return;
     }
+    this.debug("[detect] Detecting events", job.turn);
+    const events = await this.eventDetector.detect(job);
+    this.debug(
+      `[detect] Detected ${events.length} events:`,
+      JSON.stringify(events, null, 2),
+    );
 
-    try {
-      // Prefer job-provided snapshots; fallback to current buffers
-      const fullContext = job.fullContext ?? this.fullContextBuffer.getWindow();
-      const uncommentedText =
-        job.uncommentedText ?? this.uncommentedBuffer.getWindow();
+    // Make decision
+    const decision = this.decisionEngine.evaluate(events, job.turn.endTime);
+    this.debug(
+      `[decision] ${decision.shouldComment ? "YES" : "NO"} (score: ${decision.score.toFixed(2)})`,
+    );
 
-      // Detect events using uncommented text for better event detection
-      const events = await this.eventDetector.detect({
-        turn: job.turn,
-        uncommentedText,
-        fullContext,
-      });
-      this.debug(
-        `Detected ${events.length} events:`,
-        JSON.stringify(events, null, 2),
-      );
-
-      // Make decision
-      const decision = this.decisionEngine.evaluate(events, job.turn.endTime);
-      this.debug(
-        `Decision: ${decision.shouldComment ? "YES" : "NO"} (score: ${decision.score.toFixed(2)})`,
-      );
-
-      // Generate comment if decided
-      if (decision.shouldComment) {
-        // Cancel any pending comment
-        if (this.pendingComment) {
-          clearTimeout(this.pendingComment);
-          this.pendingComment = null;
-        }
-
-        // Schedule comment generation with suggested delay
-        this.pendingComment = setTimeout(async () => {
-          await this.generateAndEmitComment(job.turn, events);
-          this.pendingComment = null;
-        }, decision.suggestedDelay);
+    // Generate comment if decided
+    if (decision.shouldComment) {
+      // Cancel any pending comment
+      if (this.pendingComment) {
+        clearTimeout(this.pendingComment);
+        this.pendingComment = null;
       }
-    } catch (error) {
-      this.handleError(error as Error);
+
+      // Schedule comment generation with suggested delay
+      this.pendingComment = setTimeout(async () => {
+        await this.generateAndEmitComment(job.turn, events);
+        this.pendingComment = null;
+      }, decision.suggestedDelay);
     }
   }
 
@@ -217,21 +229,23 @@ export class CommentSystem implements Disposable {
 
       const startCommentTime = performance.now();
 
+      this.debug("[comment-gen] Generating comment", context);
+
       const commentResponse = await generateComment(context, {
         ...this.config.commentGenerator,
         apiKeys: this.apiKeys,
         // signal:
       });
 
-      for await (const chunk of commentResponse) {
-        if (chunk.type === "agent_updated_stream_event") {
-          this.debug(`Agent updated: ${chunk.agent.name}`);
-        } else if (chunk.type === "run_item_stream_event") {
-          this.debug(`Run item: ${chunk.name}, ${chunk.item}`);
-        } else if (chunk.type === "raw_model_stream_event") {
-          this.debug(`Raw model: ${chunk.data}`);
-        }
-      }
+      // for await (const chunk of commentResponse) {
+      //   if (chunk.type === "agent_updated_stream_event") {
+      //     this.debug(`Agent updated: ${chunk.agent.name}`);
+      //   } else if (chunk.type === "run_item_stream_event") {
+      //     this.debug(`Run item: ${chunk.name}, ${JSON.stringify(chunk.item.toJSON())}`);
+      //   } else if (chunk.type === "raw_model_stream_event") {
+      //     this.debug(`Raw model: ${JSON.stringify(chunk.data)}`);
+      //   }
+      // }
       await commentResponse.completed;
       const commentResult = commentResponse.finalOutput!;
 
