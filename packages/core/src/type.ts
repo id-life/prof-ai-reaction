@@ -4,9 +4,9 @@ export interface Turn {
   id: string;
   content: string;
   /** normal playback time in seconds */
-  startTime: number; 
+  startTime: number;
   /** normal playback time in seconds */
-  endTime: number; 
+  endTime: number;
 }
 
 export interface TextSegment {
@@ -67,7 +67,6 @@ export interface Decision {
   reasoning: string;
 }
 
-
 export interface Comment {
   id: string;
   content: string;
@@ -79,4 +78,3 @@ export interface Comment {
     timestamp: number;
   };
 }
-

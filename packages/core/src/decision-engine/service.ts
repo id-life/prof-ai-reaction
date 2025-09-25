@@ -17,7 +17,7 @@ export class DecisionEngine {
   evaluate(events: Event[], timestamp: number): Decision {
     this.logger.debug("Starting decision evaluation", () => ({
       eventCount: events.length,
-      eventTypes: events.map(e => e.type),
+      eventTypes: events.map((e) => e.type),
       timestamp,
       lastCommentTime: this.lastCommentTime,
       dynamicThreshold: this.dynamicThreshold,
@@ -38,7 +38,9 @@ export class DecisionEngine {
       this.logger.trace("Calculated emotion factor", {
         emotionEventsCount: emotionEvents.length,
         maxConfidence: factors.emotion,
-        avgConfidence: emotionEvents.reduce((sum, e) => sum + e.confidence, 0) / emotionEvents.length,
+        avgConfidence:
+          emotionEvents.reduce((sum, e) => sum + e.confidence, 0) /
+          emotionEvents.length,
       });
     }
 
@@ -49,7 +51,9 @@ export class DecisionEngine {
       this.logger.trace("Calculated topic factor", {
         topicEventsCount: topicEvents.length,
         maxConfidence: factors.topic,
-        avgConfidence: topicEvents.reduce((sum, e) => sum + e.confidence, 0) / topicEvents.length,
+        avgConfidence:
+          topicEvents.reduce((sum, e) => sum + e.confidence, 0) /
+          topicEvents.length,
       });
     }
 
@@ -89,9 +93,11 @@ export class DecisionEngine {
       );
       this.logger.trace("Calculated importance factor", {
         importantEventsCount: importantEvents.length,
-        eventTypes: importantEvents.map(e => e.type),
+        eventTypes: importantEvents.map((e) => e.type),
         maxConfidence: factors.importance,
-        avgConfidence: importantEvents.reduce((sum, e) => sum + e.confidence, 0) / importantEvents.length,
+        avgConfidence:
+          importantEvents.reduce((sum, e) => sum + e.confidence, 0) /
+          importantEvents.length,
       });
     }
 
@@ -102,7 +108,9 @@ export class DecisionEngine {
       this.logger.trace("Calculated keyword factor", {
         questionEventsCount: questionEvents.length,
         maxConfidence: factors.keyword,
-        avgConfidence: questionEvents.reduce((sum, e) => sum + e.confidence, 0) / questionEvents.length,
+        avgConfidence:
+          questionEvents.reduce((sum, e) => sum + e.confidence, 0) /
+          questionEvents.length,
       });
     }
 
@@ -110,7 +118,9 @@ export class DecisionEngine {
     const contentQualityBonus = this.calculateContentQualityBonus(events);
     this.logger.trace("Calculated content quality bonus", {
       bonus: contentQualityBonus,
-      eventsWithQuality: events.filter(e => e.metadata?.contentQualityScore !== undefined).length,
+      eventsWithQuality: events.filter(
+        (e) => e.metadata?.contentQualityScore !== undefined,
+      ).length,
     });
 
     // Calculate weighted score
@@ -157,8 +167,15 @@ export class DecisionEngine {
     // Make decision
     const shouldComment = finalScore > this.dynamicThreshold;
     const confidence = Math.min(finalScore / this.dynamicThreshold, 1);
-    const suggestedDelay = this.calculateSuggestedDelay(priority, timeSinceLastComment);
-    const reasoning = this.generateReasoning(factors, finalScore, shouldComment);
+    const suggestedDelay = this.calculateSuggestedDelay(
+      priority,
+      timeSinceLastComment,
+    );
+    const reasoning = this.generateReasoning(
+      factors,
+      finalScore,
+      shouldComment,
+    );
 
     // Adjust threshold for next decision
     const oldThreshold = this.dynamicThreshold;
@@ -175,7 +192,7 @@ export class DecisionEngine {
       thresholdAdjustment: parseFloat(thresholdAdjustment.toFixed(3)),
       reasoning,
       factors: Object.fromEntries(
-        Object.entries(factors).map(([k, v]) => [k, parseFloat(v.toFixed(3))])
+        Object.entries(factors).map(([k, v]) => [k, parseFloat(v.toFixed(3))]),
       ),
       modifiers: {
         contentQualityBonus: parseFloat(contentQualityBonus.toFixed(3)),
@@ -245,7 +262,7 @@ export class DecisionEngine {
       currentTimestamp,
       recentCommentsCount,
       suppression,
-      recentCommentTimes: recentComments.map(c => c.metadata?.timestamp),
+      recentCommentTimes: recentComments.map((c) => c.metadata?.timestamp),
     });
 
     return suppression;
@@ -312,7 +329,8 @@ export class DecisionEngine {
     }
 
     const adjustment = this.dynamicThreshold - oldThreshold;
-    if (Math.abs(adjustment) > 0.001) { // Only log significant changes
+    if (Math.abs(adjustment) > 0.001) {
+      // Only log significant changes
       this.logger.debug("Adjusted dynamic threshold", {
         oldThreshold: parseFloat(oldThreshold.toFixed(3)),
         newThreshold: parseFloat(this.dynamicThreshold.toFixed(3)),
@@ -348,7 +366,11 @@ export class DecisionEngine {
         eventsWithQuality: qualityScores.length,
         rawBonus: parseFloat(bonus.toFixed(3)),
         cappedBonus: parseFloat(cappedBonus.toFixed(3)),
-        avgQualityScore: parseFloat((qualityScores.reduce((sum, s) => sum + s, 0) / qualityScores.length).toFixed(2)),
+        avgQualityScore: parseFloat(
+          (
+            qualityScores.reduce((sum, s) => sum + s, 0) / qualityScores.length
+          ).toFixed(2),
+        ),
         qualityScores,
       });
     }
@@ -403,9 +425,10 @@ export class DecisionEngine {
     this.logger.debug("Comment history updated", {
       historyLength: this.commentHistory.length,
       lastCommentTimeChanged: this.lastCommentTime !== previousLastCommentTime,
-      timeSincePreviousComment: previousLastCommentTime === -Infinity
-        ? null
-        : (this.lastCommentTime - previousLastCommentTime) / 1000,
+      timeSincePreviousComment:
+        previousLastCommentTime === -Infinity
+          ? null
+          : (this.lastCommentTime - previousLastCommentTime) / 1000,
       trimmed,
     });
   }

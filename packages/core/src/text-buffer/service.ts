@@ -29,7 +29,10 @@ export class TextBuffer {
       timestamp: turn.endTime,
       position: segment.position,
       totalSegments: this.segments.length,
-      bufferSizeCharacters: this.segments.reduce((sum, s) => sum + s.content.length, 0),
+      bufferSizeCharacters: this.segments.reduce(
+        (sum, s) => sum + s.content.length,
+        0,
+      ),
     }));
   }
 
@@ -42,9 +45,10 @@ export class TextBuffer {
 
     this.logger.trace("Retrieved window", () => ({
       requestedSizeSeconds: size,
-      actualSizeSeconds: filteredSegments.length > 0
-        ? (now - filteredSegments[0].timestamp) / 1000
-        : 0,
+      actualSizeSeconds:
+        filteredSegments.length > 0
+          ? (now - filteredSegments[0].timestamp) / 1000
+          : 0,
       totalSegments: this.segments.length,
       windowSegments: filteredSegments.length,
       windowCharacters: windowText.length,
@@ -253,9 +257,15 @@ export class ShortTurnAggregator implements Disposable {
       wordCountChange: this.aggregatedWordCount - previousWordCount,
       elapsedMs,
       thresholds: {
-        durationReached: { value: durationReached, threshold: this.config.minTurnDurationMs },
+        durationReached: {
+          value: durationReached,
+          threshold: this.config.minTurnDurationMs,
+        },
         wordLimitReached: { value: wordLimitReached, threshold: maxWords },
-        totalDurationExceeded: { value: totalDurationExceeded, threshold: maxTotalDuration },
+        totalDurationExceeded: {
+          value: totalDurationExceeded,
+          threshold: maxTotalDuration,
+        },
       },
     }));
 
@@ -292,13 +302,16 @@ export class ShortTurnAggregator implements Disposable {
     this.timeoutHandle = setTimeout(() => {
       const pending = this.peek();
       if (pending) {
-        this.logger.debug("Aggregation timeout reached, emitting buffered turn", {
-          turnId: pending.id,
-          bufferedContent: pending.content.substring(0, 100),
-          wordCount: this.aggregatedWordCount,
-          elapsedMs: (pending.endTime - pending.startTime) * 1000,
-          timeoutMs: this.config.aggregationMaxDelayMs,
-        });
+        this.logger.debug(
+          "Aggregation timeout reached, emitting buffered turn",
+          {
+            turnId: pending.id,
+            bufferedContent: pending.content.substring(0, 100),
+            wordCount: this.aggregatedWordCount,
+            elapsedMs: (pending.endTime - pending.startTime) * 1000,
+            timeoutMs: this.config.aggregationMaxDelayMs,
+          },
+        );
         this.emitter.emit("timeout", pending);
       }
       this.clearTimeout();
@@ -366,9 +379,10 @@ export class ShortTurnAggregator implements Disposable {
       this.logger.debug("Clearing aggregator", {
         discardedContentLength: this.bufferedContent.length,
         discardedWordCount: this.aggregatedWordCount,
-        elapsedMs: this.bufferedStartTime > 0 && this.lastTurnEndTime > 0
-          ? (this.lastTurnEndTime - this.bufferedStartTime) * 1000
-          : 0,
+        elapsedMs:
+          this.bufferedStartTime > 0 && this.lastTurnEndTime > 0
+            ? (this.lastTurnEndTime - this.bufferedStartTime) * 1000
+            : 0,
       });
     }
     this.clearTimeout();

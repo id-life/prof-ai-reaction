@@ -74,8 +74,16 @@ export class EventDetector {
         turnId: turn.id,
         detectionTimeMs: Math.round(detectionTimeMs),
         totalEvents: events.length,
-        eventTypes: events.map(e => e.type),
-        avgConfidence: events.length > 0 ? parseFloat((events.reduce((sum, e) => sum + e.confidence, 0) / events.length).toFixed(2)) : 0,
+        eventTypes: events.map((e) => e.type),
+        avgConfidence:
+          events.length > 0
+            ? parseFloat(
+                (
+                  events.reduce((sum, e) => sum + e.confidence, 0) /
+                  events.length
+                ).toFixed(2),
+              )
+            : 0,
       });
 
       return events;
@@ -218,9 +226,7 @@ export class EventDetector {
     return true;
   }
 
-  private getFilterReason(
-    event: z.infer<typeof DetectedEventSchema>,
-  ): string {
+  private getFilterReason(event: z.infer<typeof DetectedEventSchema>): string {
     if (event.confidence < this.config.detectionSensitivity) {
       return `confidence ${event.confidence} below threshold ${this.config.detectionSensitivity}`;
     }
