@@ -1,4 +1,5 @@
 export {
+  defaultEventDetectorConfig,
   type EventDetectorConfig,
   EventDetectorConfigSchema,
 } from "./def.js";

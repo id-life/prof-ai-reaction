@@ -1,25 +1,5 @@
-import type { TextSegment, Turn } from "./type.js";
-
-export interface TextBufferConfig {
-  /** in characters */
-  bufferSize: number;
-  /** in seconds */
-  windowDuration: number;
-  /** in characters */
-  segmentMaxSize: number;
-  /** in seconds */
-  retentionTime: number;
-  /** in seconds */
-  cleanupInterval: number; // seconds
-}
-
-export interface BufferStats {
-  totalCharacters: number;
-  segmentCount: number;
-  oldestTimestamp: number;
-  newestTimestamp: number;
-  averageSegmentSize: number;
-}
+import type { TextSegment, Turn } from "../type.js";
+import type { BufferStats, TextBufferConfig } from "./def.js";
 
 export class TextBuffer {
   private segments: TextSegment[] = [];

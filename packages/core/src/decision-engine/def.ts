@@ -1,6 +1,5 @@
 import z from "zod";
 
-
 export interface Decision {
   shouldComment: boolean;
   confidence: number; // 0-1
@@ -41,5 +40,18 @@ export const DecisionEngineConfigSchema = z.object({
     .describe("Frequency suppression factor"),
   timeDecayRate: z.number().min(0).max(1).describe("Time decay rate"),
 });
+
+export const defaultDecisionEngineConfig: DecisionEngineConfig = {
+  baseThreshold: 0.65, // Increased to reduce comment frequency
+  minInterval: 20, // Increased minimum interval between comments
+  maxInterval: 90, // Increased maximum interval
+  emotionWeight: 0.2,
+  topicWeight: 0.4,
+  timingWeight: 0.15,
+  importanceWeight: 0.6,
+  keywordWeight: 0.3,
+  frequencySuppression: 0.8,
+  timeDecayRate: 0.95,
+};
 
 export type DecisionEngineConfig = z.output<typeof DecisionEngineConfigSchema>;

@@ -1,13 +1,32 @@
-import { run } from "@openai/agents";
-import type { CommentStyle, Event } from "../type.js";
-import selector from "./agents/selector.js";
+import { run, setDefaultOpenAIKey } from "@openai/agents";
+import type { ApiKeys } from "../config.js";
+import type { Comment, Event } from "../type.js";
+import { buildCommentAgent } from "./agents/_base.js";
+import buildCommentGenerator from "./agents/selector.js";
+import type { CommentGeneratorConfig } from "./def.js";
 
 export async function generateComment(
   context: GenerationContext,
-  { signal }: { signal?: AbortSignal } = {},
+  {
+    signal,
+    writers,
+    selectorInstructions,
+    selectorModel,
+    apiKeys,
+  }: CommentGeneratorConfig & {
+    signal?: AbortSignal;
+    apiKeys: Pick<ApiKeys, "openai">;
+  },
 ) {
+  setDefaultOpenAIKey(apiKeys.openai);
   const userInput = buildUserInput(context);
-  const response = await run(selector, userInput, { signal, stream: true });
+  const agent = buildCommentGenerator({
+    writers: writers.map((w) => buildCommentAgent(w)),
+    selectorInstructions,
+    selectorModel,
+  });
+
+  const response = await run(agent, userInput, { signal, stream: true });
   return response;
 }
 
@@ -21,7 +40,7 @@ function buildUserInput(ctx: GenerationContext): string {
     ctx.uncommentedText?.slice(-600) || ctx.historicalText.slice(-400);
   const previousCommentsContext = ctx.previousComments
     .slice(-3)
-    .map((c) => `"${c.content}" (${c.style})`)
+    .map((c) => `"${c.content}" (${c.writer})`)
     .join("; ");
 
   return JSON.stringify({
@@ -38,9 +57,6 @@ export interface GenerationContext {
   currentText: string;
   historicalText: string;
   uncommentedText?: string;
-  previousComments: Array<{
-    content: string;
-    style: CommentStyle;
-  }>;
+  previousComments: Comment[];
   events: Event[];
 }

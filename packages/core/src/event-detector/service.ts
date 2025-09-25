@@ -2,6 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 import { nanoid } from "nanoid";
 import { OpenAI } from "openai";
 import type { z } from "zod";
+import type { ApiKeys } from "../config.js";
 import { zodGeminiFormat, zodResponseFormat } from "../lib/zod4-schema.js";
 import type { Event, EventType, Turn } from "../type.js";
 import {
@@ -12,15 +13,25 @@ import {
   systemPrompt,
 } from "./def.js";
 
+type RequestOptions = {
+  signal?: AbortSignal;
+};
+
 export class EventDetector {
   private lastEventTime: Map<EventType, number> = new Map();
 
-  constructor(private config: EventDetectorConfig) {}
+  constructor(
+    private config: EventDetectorConfig,
+    private apiKeys: ApiKeys,
+  ) {}
 
   async detect(
-    turn: Turn,
-    uncommentedText: string,
-    fullContext?: string,
+    {
+      turn,
+      uncommentedText,
+      fullContext,
+    }: { turn: Turn; uncommentedText: string; fullContext?: string },
+    { signal }: RequestOptions = {},
   ): Promise<Event[]> {
     const events: Event[] = [];
     const now = turn.endTime;
@@ -28,10 +39,13 @@ export class EventDetector {
     // AI-powered event detection using uncommented text for better context
     const contextForDetection = fullContext || uncommentedText;
     const aiEvents = await this.detectWithAI(
-      turn.content,
-      uncommentedText,
-      contextForDetection,
-      now,
+      {
+        content: turn.content,
+        uncommentedText,
+        fullContext: contextForDetection,
+        timestamp: now,
+      },
+      { signal },
     );
     for (const aiEvent of aiEvents) {
       events.push(aiEvent);
@@ -42,21 +56,29 @@ export class EventDetector {
   }
 
   private async detectWithAI(
-    content: string,
-    uncommentedText: string,
-    fullContext: string,
-    timestamp: number,
+    {
+      content,
+      uncommentedText,
+      fullContext,
+      timestamp,
+    }: {
+      content: string;
+      uncommentedText: string;
+      fullContext: string;
+      timestamp: number;
+    },
+    { signal }: RequestOptions,
   ) {
     const immediateContext = uncommentedText;
     const broadContext = fullContext.slice(-1500);
 
     const userPrompt = buildUserPrompt(immediateContext, broadContext, content);
 
-    const provider = this.config.model.provider;
+    const provider = this.config.modelProvider;
     const analysis =
       provider === "google"
-        ? await this.detectWithGemini(systemPrompt, userPrompt)
-        : await this.detectWithOpenAI(systemPrompt, userPrompt);
+        ? await this.detectWithGemini(systemPrompt, userPrompt, { signal })
+        : await this.detectWithOpenAI(systemPrompt, userPrompt, { signal });
     return analysis.events
       .filter((event) => this.filterDetectedEvents(event))
       .map(
@@ -107,23 +129,26 @@ export class EventDetector {
     return true;
   }
 
-  private async detectWithGemini(systemPrompt: string, userPrompt: string) {
+  private async detectWithGemini(
+    systemPrompt: string,
+    userPrompt: string,
+    { signal }: RequestOptions,
+  ) {
     const { responseSchema, parse } = zodGeminiFormat(EventAnalysisSchema);
 
-    if (this.config.model.provider !== "google") {
+    if (this.config.modelProvider !== "google") {
       throw new Error("Invalid model provider");
     }
 
-    const { apiKey, model } = this.config.model;
-
-    const google = new GoogleGenAI({ apiKey });
+    const google = new GoogleGenAI({ apiKey: this.apiKeys.google });
 
     const response = await google.models.generateContent({
-      model,
+      model: this.config.model,
       contents: `${systemPrompt}\n\n${userPrompt}`,
       config: {
         responseMimeType: "application/json",
         responseSchema,
+        abortSignal: signal,
       },
     });
 
@@ -142,30 +167,38 @@ export class EventDetector {
     return analysis;
   }
 
-  private async detectWithOpenAI(systemPrompt: string, userPrompt: string) {
-    if (this.config.model.provider !== "openai") {
+  private async detectWithOpenAI(
+    systemPrompt: string,
+    userPrompt: string,
+    { signal }: RequestOptions,
+  ) {
+    if (this.config.modelProvider !== "openai") {
       throw new Error("Invalid model provider");
     }
 
-    const { apiKey, model } = this.config.model;
-
-    const openai = new OpenAI({ apiKey });
-    const response = await openai.chat.completions.parse({
-      model,
-      messages: [
-        {
-          role: "system",
-          content: systemPrompt,
-        },
-        {
-          role: "user",
-          content: userPrompt,
-        },
-      ],
-      response_format: zodResponseFormat(EventAnalysisSchema, "event_analysis"),
-      reasoning_effort: "minimal",
-      verbosity: "low",
-    });
+    const openai = new OpenAI({ apiKey: this.apiKeys.openai });
+    const response = await openai.chat.completions.parse(
+      {
+        model: this.config.model,
+        messages: [
+          {
+            role: "system",
+            content: systemPrompt,
+          },
+          {
+            role: "user",
+            content: userPrompt,
+          },
+        ],
+        response_format: zodResponseFormat(
+          EventAnalysisSchema,
+          "event_analysis",
+        ),
+        reasoning_effort: "minimal",
+        verbosity: "low",
+      },
+      { signal },
+    );
 
     console.debug("OpenAI response:", response);
 

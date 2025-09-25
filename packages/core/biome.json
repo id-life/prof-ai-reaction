@@ -4,6 +4,18 @@
   "extends": "//",
   "files": {
     "ignoreUnknown": true,
-    "includes": ["src/**", "!node_modules", "!dist", "!build"]
+    "includes": [
+      "src/**",
+      "!node_modules",
+      "!dist",
+      "!build"
+    ]
+  },
+  "linter": {
+    "rules": {
+      "style": {
+        "noNonNullAssertion": "off"
+      }
+    }
   }
 }

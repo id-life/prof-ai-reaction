@@ -65,28 +65,16 @@ export interface Decision {
   reasoning: string;
 }
 
-export const commentStyleSchema = z.enum([
-  "descriptive",
-  "analytical",
-  "emotional",
-  "summary",
-  "predictive",
-  "humorous",
-]);
-
-export type CommentStyle = z.infer<typeof commentStyleSchema>;
 
 export interface Comment {
   id: string;
   content: string;
-  style: CommentStyle;
+  writer: string;
   length: number;
   generationTime: number;
-  confidence: number;
+  // confidence: number;
   metadata?: {
     timestamp: number;
-    alternativeStyle?: string;
-    fallback?: boolean;
   };
 }
 

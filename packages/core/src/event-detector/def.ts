@@ -146,12 +146,18 @@ export const EventDetectorConfigSchema = z.object({
     .min(0)
     .max(1)
     .describe("Minimum density threshold for keypoint events"),
-  model: z.object({
-    provider: z.enum(["openai", "google"]),
-    apiKey: z.string(),
-    model: z.string(),
-  }),
+  modelProvider: z.enum(["openai", "google"]),
+  model: z.string(),
 });
+
+export const defaultEventDetectorConfig: EventDetectorConfig = {
+  detectionSensitivity: 0.7,
+  emotionThreshold: 0.75,
+  topicTransitionThreshold: 0.3,
+  keypointDensityThreshold: 5,
+  modelProvider: "openai",
+  model: "gpt-5-nano",
+};
 
 export type EventDetectorConfig = z.output<typeof EventDetectorConfigSchema>;
 
