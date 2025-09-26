@@ -2,6 +2,7 @@ import { getLogger } from "@logtape/logtape";
 import { delay } from "@std/async";
 import { createNanoEvents } from "nanoevents";
 import { nanoid } from "nanoid";
+import OpenAI from "openai";
 import { generateComment } from "./comment-gen/index.js";
 import {
   type ApiKeys,
@@ -22,8 +23,7 @@ import {
 } from "./event-detector/index.js";
 import { TextBuffer } from "./text-buffer/service.js";
 import { ShortTurnAggregator } from "./turn-agg/service.js";
-import type { Comment, Event, Turn } from "./type.js";
-import OpenAI from "openai";
+import type { Comment, Decision, Event, Turn } from "./type.js";
 
 export interface CommentSystemEvents {
   "comment-started": (
@@ -32,6 +32,16 @@ export interface CommentSystemEvents {
   ) => void;
   "comment-rejected": (reason: string, turn: Turn) => void;
   "comment-generated": (comment: Comment, turn: Turn) => void;
+  "events-detected": (
+    events: Event[],
+    turn: Turn,
+    detectionTimeMs: number,
+  ) => void;
+  "decision-made": (
+    decision: Decision,
+    turn: Turn,
+    decisionTimeMs: number,
+  ) => void;
   error: (error: unknown) => void;
 }
 
@@ -279,6 +289,14 @@ export class CommentSystem implements Disposable {
           : 0,
     });
 
+    // Emit event detection results
+    this.emitter.emit(
+      "events-detected",
+      events,
+      job.turn,
+      Math.round(detectionTimeMs),
+    );
+
     // Make decision
     const decisionStart = performance.now();
     const decision = this.decisionEngine.evaluate(events, job.turn.endTime);
@@ -295,6 +313,14 @@ export class CommentSystem implements Disposable {
       decisionTimeMs: Math.round(decisionTimeMs),
       turnId: job.turn.id,
     });
+
+    // Emit decision results
+    this.emitter.emit(
+      "decision-made",
+      decision,
+      job.turn,
+      Math.round(decisionTimeMs),
+    );
 
     // Generate comment if decided
     if (decision.shouldComment) {

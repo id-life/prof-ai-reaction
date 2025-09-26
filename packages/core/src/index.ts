@@ -39,4 +39,4 @@ export {
   type ShortTurnAggregatorConfig,
   ShortTurnAggregatorConfigSchema,
 } from "./turn-agg/index.js";
-export type { Comment, Event, Turn } from "./type.js";
+export type { Comment, Decision, Event, Turn } from "./type.js";
