@@ -17,7 +17,6 @@ interface PlayerControlsProps {
   totalDuration: number;
   playbackSpeed: number;
   onTogglePlay: () => void;
-  onPause: () => void;
   onReset: () => void;
   onSpeedChange: (speed: number) => void;
   onSeek?: (time: number) => void;
@@ -29,7 +28,6 @@ export function PlayerControls({
   totalDuration,
   playbackSpeed,
   onTogglePlay,
-  onPause,
   onReset,
   onSpeedChange,
 }: PlayerControlsProps) {
@@ -60,9 +58,6 @@ export function PlayerControls({
         ) : (
           <Play className="w-4 h-4" />
         )}
-      </Button>
-      <Button onClick={onPause} size="sm" variant="outline">
-        <Pause className="w-4 h-4" />
       </Button>
       <Button onClick={onReset} size="sm" variant="outline">
         <Square className="w-4 h-4" />

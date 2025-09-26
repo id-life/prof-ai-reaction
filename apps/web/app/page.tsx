@@ -346,12 +346,6 @@ export default function PlaygroundPage() {
     }
   };
 
-  const handlePause = () => {
-    const player = systemRef.current?.player;
-    if (!player) return;
-    player.pause();
-  };
-
   const handleSpeedChange = (speed: number) => {
     const player = systemRef.current?.player;
     if (!player) return;
@@ -441,7 +435,6 @@ export default function PlaygroundPage() {
                   totalDuration={totalDuration}
                   playbackSpeed={state.playbackSpeed}
                   onTogglePlay={togglePlay}
-                  onPause={handlePause}
                   onReset={reset}
                   onSpeedChange={handleSpeedChange}
                 />
