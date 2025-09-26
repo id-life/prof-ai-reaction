@@ -1,6 +1,6 @@
 import { Agent } from "@openai/agents";
 import { RECOMMENDED_PROMPT_PREFIX } from "@openai/agents-core/extensions";
-import z from "zod";
+import z from "zod/v4";
 import { zodAgentFormat } from "../../lib/zod4-schema.js";
 import type { CommentAgent } from "../def.js";
 

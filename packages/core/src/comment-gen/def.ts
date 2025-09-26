@@ -1,5 +1,5 @@
 import type { Agent } from "@openai/agents-core";
-import z from "zod";
+import z from "zod/v4";
 
 export type CommentAgent = Agent<
   unknown,

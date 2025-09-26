@@ -2,7 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 import { getLogger } from "@logtape/logtape";
 import { nanoid } from "nanoid";
 import { OpenAI } from "openai";
-import type { z } from "zod";
+import type { z } from "zod/v4";
 import type { ApiKeys } from "../config.js";
 import { zodGeminiFormat, zodResponseFormat } from "../lib/zod4-schema.js";
 import type { Event, EventType, Turn } from "../type.js";
