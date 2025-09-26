@@ -1,27 +1,42 @@
 import type { Agent } from "@openai/agents-core";
-import type z from "zod";
+import z from "zod";
 
 export type CommentAgent = Agent<
   unknown,
   z.ZodObject<{ reject: z.ZodLiteral<false>; content: z.ZodString }>
 >;
 
-export interface CommentGeneratorConfig {
-  writers: CommentAgentConfig[];
-  selectorModel: string;
-  selectorInstructions: string;
-}
+export const CommentAgentConfigSchema = z.object({
+  name: z.string().describe("Name of the comment agent"),
+  instructions: z.string().describe("Instructions for the comment agent"),
+  minLength: z
+    .number()
+    .min(0)
+    .describe("Minimum length of generated comments"),
+  maxLength: z
+    .number()
+    .min(0)
+    .describe("Maximum length of generated comments"),
+  model: z.string().optional().describe("Model to use for comment generation"),
+});
 
-export interface CommentAgentConfig {
-  name: string;
-  instructions: string;
-  minLength: number;
-  maxLength: number;
-  model?: string;
-}
+export const CommentGeneratorConfigSchema = z.object({
+  writers: z
+    .array(CommentAgentConfigSchema)
+    .describe("Array of comment agent configurations"),
+  selectorModel: z.string().describe("Model to use for selecting comments"),
+  selectorInstructions: z
+    .string()
+    .describe("Instructions for comment selection"),
+});
 
-export const defaultCommentGeneratorConfig = {
+export const defaultCommentGeneratorConfig: CommentGeneratorConfig = {
   writers: [],
   selectorModel: "gpt-5-mini",
   selectorInstructions: "",
-} satisfies CommentGeneratorConfig;
+};
+
+export type CommentAgentConfig = z.output<typeof CommentAgentConfigSchema>;
+export type CommentGeneratorConfig = z.output<
+  typeof CommentGeneratorConfigSchema
+>;

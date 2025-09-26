@@ -3,9 +3,9 @@ import type { DecisionEngineConfig } from "./decision-engine/index.js";
 import type { EventDetectorConfig } from "./event-detector/index.js";
 import {
   defaultTextBufferConfig,
-  type ShortTurnAggregationConfig,
   type TextBufferConfig,
 } from "./text-buffer/index.js";
+import type { ShortTurnAggregatorConfig } from "./turn-agg/def.js";
 
 export type Config = {
   commentGenerator: CommentGeneratorConfig;
@@ -13,11 +13,8 @@ export type Config = {
   eventDetector: EventDetectorConfig;
   contextBuffer: TextBufferConfig;
   uncommentedBuffer: TextBufferConfig;
-  shortTurnAggregator: ShortTurnAggregationConfig;
-  apiKeys: {
-    openai: string;
-    google: string;
-  };
+  shortTurnAggregator: ShortTurnAggregatorConfig;
+  apiKeys: ApiKeys;
 };
 
 export type ConfigInput = Partial<{
@@ -26,12 +23,12 @@ export type ConfigInput = Partial<{
   eventDetector: Partial<EventDetectorConfig>;
   contextBuffer: Partial<TextBufferConfig>;
   uncommentedBuffer: Partial<TextBufferConfig>;
-  shortTurnAggregator: Partial<ShortTurnAggregationConfig>;
+  shortTurnAggregator: Partial<ShortTurnAggregatorConfig>;
 }>;
 
 export type ApiKeys = {
-  openai: string;
-  google: string;
+  openai?: string;
+  google?: string;
 };
 
 export const defaultContextBufferConfig: TextBufferConfig = {
@@ -46,4 +43,4 @@ export const defaultUncommentedBufferConfig: TextBufferConfig = {
 export { defaultCommentGeneratorConfig } from "./comment-gen/index.js";
 export { defaultDecisionEngineConfig } from "./decision-engine/index.js";
 export { defaultEventDetectorConfig } from "./event-detector/index.js";
-export { defaultShortTurnAggregationConfig } from "./text-buffer/def.js";
+export { defaultShortTurnAggregatorConfig } from "./turn-agg/index.js";

@@ -11,6 +11,7 @@ import {
   defaultContextBufferConfig,
   defaultDecisionEngineConfig,
   defaultEventDetectorConfig,
+  defaultShortTurnAggregatorConfig,
   defaultUncommentedBufferConfig,
 } from "./config.js";
 import { DecisionEngine } from "./decision-engine/index.js";
@@ -19,8 +20,8 @@ import {
   EventDetectionQueue,
   EventDetector,
 } from "./event-detector/index.js";
-import { defaultShortTurnAggregationConfig } from "./text-buffer/def.js";
-import { ShortTurnAggregator, TextBuffer } from "./text-buffer/service.js";
+import { TextBuffer } from "./text-buffer/service.js";
+import { ShortTurnAggregator } from "./turn-agg/service.js";
 import type { Comment, Event, Turn } from "./type.js";
 
 export interface CommentSystemEvents {
@@ -82,7 +83,7 @@ export class CommentSystem implements Disposable {
         ...options.config?.uncommentedBuffer,
       },
       shortTurnAggregator: {
-        ...defaultShortTurnAggregationConfig,
+        ...defaultShortTurnAggregatorConfig,
         ...options.config?.shortTurnAggregator,
       },
     };

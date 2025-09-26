@@ -1,7 +1,6 @@
 export {
-  defaultShortTurnAggregationConfig,
   defaultTextBufferConfig,
-  type ShortTurnAggregationConfig,
   type TextBufferConfig,
+  TextBufferConfigSchema,
 } from "./def.js";
-export { ShortTurnAggregator, TextBuffer } from "./service.js";
+export { TextBuffer } from "./service.js";

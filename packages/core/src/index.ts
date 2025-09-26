@@ -1,11 +1,22 @@
 export {
+  type CommentAgentConfig,
+  CommentAgentConfigSchema,
   type CommentGeneratorConfig,
-  generateComment,
+  CommentGeneratorConfigSchema,
   writers,
 } from "./comment-gen/index.js";
 export type {
   ApiKeys,
   Config,
+  ConfigInput,
+} from "./config.js";
+export {
+  defaultCommentGeneratorConfig,
+  defaultContextBufferConfig,
+  defaultDecisionEngineConfig,
+  defaultEventDetectorConfig,
+  defaultShortTurnAggregatorConfig,
+  defaultUncommentedBufferConfig,
 } from "./config.js";
 export {
   type DecisionEngineConfig,
@@ -20,8 +31,12 @@ export {
   type CommentSystemEvents,
   createCommentSystem,
 } from "./system.js";
-export type {
-  ShortTurnAggregationConfig,
-  TextBufferConfig,
+export {
+  type TextBufferConfig,
+  TextBufferConfigSchema,
 } from "./text-buffer/index.js";
+export {
+  type ShortTurnAggregatorConfig,
+  ShortTurnAggregatorConfigSchema,
+} from "./turn-agg/index.js";
 export type { Comment, Event, Turn } from "./type.js";

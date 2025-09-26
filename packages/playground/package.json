@@ -11,7 +11,7 @@
   },
   "keywords": [],
   "dependencies": {
-    "ai-reaction": "workspace:*",
+    "@prof/ai-reaction": "workspace:*",
     "media-captions": "^0.0.18",
     "nanoevents": "^9.1.0"
   },

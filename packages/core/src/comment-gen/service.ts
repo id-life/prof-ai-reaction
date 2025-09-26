@@ -18,6 +18,9 @@ export async function generateComment(
     apiKeys: Pick<ApiKeys, "openai">;
   },
 ) {
+  if (!apiKeys.openai) {
+    throw new Error("OpenAI API key is required to generate a comment");
+  }
   setDefaultOpenAIKey(apiKeys.openai);
   const userInput = buildUserInput(context);
   const agent = buildCommentGenerator({

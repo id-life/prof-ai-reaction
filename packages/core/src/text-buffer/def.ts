@@ -1,21 +1,31 @@
-export interface TextBufferConfig {
-  /** in characters */
-  bufferSize: number;
-  /** in seconds */
-  windowDuration: number;
-  /** in characters */
-  segmentMaxSize: number;
-  /** in seconds */
-  retentionTime: number;
-}
+import z from "zod";
 
-export interface BufferStats {
-  totalCharacters: number;
-  segmentCount: number;
-  oldestTimestamp: number;
-  newestTimestamp: number;
-  averageSegmentSize: number;
-}
+export const TextBufferConfigSchema = z.object({
+  bufferSize: z
+    .number()
+    .min(0)
+    .describe("Buffer size in characters"),
+  windowDuration: z
+    .number()
+    .min(0)
+    .describe("Window duration in seconds"),
+  segmentMaxSize: z
+    .number()
+    .min(0)
+    .describe("Maximum segment size in characters"),
+  retentionTime: z
+    .number()
+    .min(0)
+    .describe("Retention time in seconds"),
+});
+
+export const BufferStatsSchema = z.object({
+  totalCharacters: z.number(),
+  segmentCount: z.number(),
+  oldestTimestamp: z.number(),
+  newestTimestamp: z.number(),
+  averageSegmentSize: z.number(),
+});
 
 export const defaultTextBufferConfig: TextBufferConfig = {
   bufferSize: 100000,
@@ -24,23 +34,5 @@ export const defaultTextBufferConfig: TextBufferConfig = {
   retentionTime: 300,
 };
 
-export interface ShortTurnAggregationConfig {
-  /** Minimal duration required to consider a turn ready (ms) */
-  minTurnDurationMs: number;
-  /** Max time to wait to aggregate short turns before clearing (ms) */
-  aggregationMaxDelayMs: number;
-  /** Max allowed gap between short turns to aggregate as siblings (ms) */
-  aggregationMaxGapMs: number;
-  /** Max words allowed before aggregated turn flushes (0 disables word limit) */
-  aggregationMaxWords?: number;
-  /** Max total duration allowed for aggregated turn before flush (ms, 0 disables) */
-  aggregationMaxTotalDurationMs?: number;
-}
-
-export const defaultShortTurnAggregationConfig: ShortTurnAggregationConfig = {
-  minTurnDurationMs: 1200,
-  aggregationMaxDelayMs: 800,
-  aggregationMaxGapMs: 400,
-  aggregationMaxWords: 50,
-  aggregationMaxTotalDurationMs: 12e3,
-};
+export type TextBufferConfig = z.output<typeof TextBufferConfigSchema>;
+export type BufferStats = z.output<typeof BufferStatsSchema>;
