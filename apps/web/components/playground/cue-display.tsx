@@ -69,14 +69,14 @@ export function CueDisplay({ turns, activeTurns, onSeek }: CueDisplayProps) {
               }
             }}
             onClick={() => handleCueClick(turn)}
-            className={`p-3 rounded border transition-colors cursor-pointer hover:bg-muted/70 ${
+            className={`w-full text-left p-3 rounded border transition-colors cursor-pointer hover:bg-muted/70 ${
               isActive ? "bg-primary/10 border-primary" : "bg-muted/50"
             }`}
           >
-            <div className="text-xs text-muted-foreground">
+            <span className="block text-xs text-muted-foreground">
               {formatTime(turn.startTime)} - {formatTime(turn.endTime)}
-            </div>
-            <div className="text-sm">{turn.content}</div>
+            </span>
+            <span className="block text-sm">{turn.content}</span>
           </button>
         );
       })}
