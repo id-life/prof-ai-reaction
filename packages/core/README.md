@@ -12,23 +12,23 @@
 
 ```mermaid
 flowchart TD
-  A[外部输入: Turn 完结] --> B[TextBuffer fullContext\n完整上下文缓冲]
-  A --> C[TextBuffer uncommentedBuffer\n未被评论的上下文缓冲]
+  A[外部输入: Turn 完结] --> B[TextBuffer fullContext<br/>完整上下文缓冲]
+  A --> C[TextBuffer uncommentedBuffer<br/>未被评论的上下文缓冲]
   A --> D[ShortTurnAggregator\n短时长聚合器]
 
   D -- 小于时长阈值 --> D
-  D -- 合并完成/超时/长于阈值 --> E[EventDetectionQueue\n只保留最新任务]
+  D -- 合并完成/超时/长于阈值 --> E[EventDetectionQueue<br/>只保留最新任务]
 
-  E --> F[EventDetector\n事件检测(OpenAI/Google)]
-  F --> G[DecisionEngine\n决策引擎]
+  E --> F[EventDetector<br/>事件检测 OpenAI/Google]
+  F --> G[DecisionEngine<br/>决策引擎]
 
-  G -- shouldComment=false --> H[跳过本次\n等待下一个 Turn]
+  G -- shouldComment=false --> H[跳过本次<br/>等待下一个 Turn]
   G -- shouldComment=true --> I[延迟 suggestedDelay]
-  I --> J[CommentGenerator\n评论生成(多写手 + 选择器)]
+  I --> J[CommentGenerator<br/>评论生成 多写手 + 选择器]
 
   J --> K[emit: comment-generated]
   K --> L[DecisionEngine.updateHistory]
-  K --> M[UncommentedBuffer.clear\n清空未评论缓冲]
+  K --> M[UncommentedBuffer.clear<br/>清空未评论缓冲]
 ```
 
 关键点：
@@ -171,9 +171,7 @@ sequenceDiagram
 
 ---
 
-## 常见调参食谱（示例）
-
-以下是“只需要改配置”的示例片段。你可以将它们合并到你的配置来源（UI 或 JSON）中；只需覆盖你关心的字段。
+## 常见调参范式
 
 ### 示例 A：少但更高质量的评论（偏稳健）
 
