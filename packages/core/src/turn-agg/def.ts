@@ -12,17 +12,23 @@ export const ShortTurnAggregatorConfigSchema = z.object({
   aggregationMaxGapMs: z
     .number()
     .min(0)
-    .describe("Max allowed gap between short turns to aggregate as siblings (ms)"),
+    .describe(
+      "Max allowed gap between short turns to aggregate as siblings (ms)",
+    ),
   aggregationMaxWords: z
     .number()
     .min(0)
     .optional()
-    .describe("Max words allowed before aggregated turn flushes (0 disables word limit)"),
+    .describe(
+      "Max words allowed before aggregated turn flushes (0 disables word limit)",
+    ),
   aggregationMaxTotalDurationMs: z
     .number()
     .min(0)
     .optional()
-    .describe("Max total duration allowed for aggregated turn before flush (ms, 0 disables)"),
+    .describe(
+      "Max total duration allowed for aggregated turn before flush (ms, 0 disables)",
+    ),
 });
 
 export const defaultShortTurnAggregatorConfig: ShortTurnAggregatorConfig = {
@@ -33,4 +39,6 @@ export const defaultShortTurnAggregatorConfig: ShortTurnAggregatorConfig = {
   aggregationMaxTotalDurationMs: 12e3,
 };
 
-export type ShortTurnAggregatorConfig = z.output<typeof ShortTurnAggregatorConfigSchema>;
+export type ShortTurnAggregatorConfig = z.output<
+  typeof ShortTurnAggregatorConfigSchema
+>;

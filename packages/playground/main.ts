@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { createCommentSystem, type Turn, writers } from "ai-reaction";
+import { createCommentSystem, type Turn, writers } from "@prof/ai-reaction";
 import { parseText } from "media-captions";
 import { createNanoEvents } from "nanoevents";
 
@@ -130,8 +130,22 @@ export async function main(input: string) {
     commentSystem.onTurnCompleted(cue);
   });
 
+  commentSystem.on("comment-started", async (comment) => {
+    for await (const event of comment) {
+      if (event.type === "agent_updated_stream_event") {
+        console.log("[agent_updated_stream_event]", event);
+      } else if (event.type === "run_item_stream_event") {
+        console.log("[run_item_stream_event]", event);
+      } else if (event.type === "raw_model_stream_event") {
+        console.log("[raw_model_stream_event]", event);
+      }
+    }
+  });
   commentSystem.on("comment-generated", (comment) => {
     console.log("[comment-generated]", comment);
+  });
+  commentSystem.on("comment-rejected", (reason) => {
+    console.log("[comment-rejected]", reason);
   });
 
   player.setSpeed(3);

@@ -6,12 +6,7 @@ import {
   CommentGeneratorConfigSchema,
 } from "@prof/ai-reaction";
 import { Plus, Trash2 } from "lucide-react";
-import {
-  FieldValues,
-  UseFormReturn,
-  useFieldArray,
-  useForm,
-} from "react-hook-form";
+import { useFieldArray, useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {

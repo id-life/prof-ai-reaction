@@ -11,7 +11,7 @@ interface CueDisplayProps {
 
 export function CueDisplay({ turns, activeTurns, onSeek }: CueDisplayProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const activeCueRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const activeCueRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -58,7 +58,8 @@ export function CueDisplay({ turns, activeTurns, onSeek }: CueDisplayProps) {
       {turns.map((turn) => {
         const isActive = activeTurns.has(turn.id);
         return (
-          <div
+          <button
+            type="button"
             key={turn.id}
             ref={(el) => {
               if (el && isActive) {
@@ -76,7 +77,7 @@ export function CueDisplay({ turns, activeTurns, onSeek }: CueDisplayProps) {
               {formatTime(turn.startTime)} - {formatTime(turn.endTime)}
             </div>
             <div className="text-sm">{turn.content}</div>
-          </div>
+          </button>
         );
       })}
     </div>

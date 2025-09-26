@@ -12,9 +12,8 @@ export class TextBuffer {
 
   private countWords(text: string): number {
     const segments = Array.from(this.segmenter.segment(text));
-    return segments.filter(segment =>
-      segment.isWordLike &&
-      /\w/.test(segment.segment)
+    return segments.filter(
+      (segment) => segment.isWordLike && /\w/.test(segment.segment),
     ).length;
   }
 
@@ -73,10 +72,13 @@ export class TextBuffer {
   getLastNWords(n: number): string {
     const allText = this.segments.map((s) => s.content).join(" ");
     const segments = Array.from(this.segmenter.segment(allText));
-    const words = segments.filter(segment =>
-      segment.isWordLike && /\w/.test(segment.segment)
+    const words = segments.filter(
+      (segment) => segment.isWordLike && /\w/.test(segment.segment),
     );
-    return words.slice(-n).map(w => w.segment).join("");
+    return words
+      .slice(-n)
+      .map((w) => w.segment)
+      .join("");
   }
 
   search(
@@ -166,7 +168,10 @@ export class TextBuffer {
       requestedCount: count,
       actualCount: recent.length,
       totalSegments: this.segments.length,
-      recentWords: recent.reduce((sum, s) => sum + this.countWords(s.content), 0),
+      recentWords: recent.reduce(
+        (sum, s) => sum + this.countWords(s.content),
+        0,
+      ),
     });
 
     return recent;

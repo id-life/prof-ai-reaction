@@ -15,6 +15,10 @@
     "media-captions": "^0.0.18",
     "nanoevents": "^9.1.0"
   },
+  "devDependencies": {
+    "@types/node": "^24",
+    "typescript": "~5.9.2"
+  },
   "author": "",
   "license": "ISC",
   "packageManager": "pnpm@10.6.4"

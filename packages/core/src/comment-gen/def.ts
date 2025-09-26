@@ -9,14 +9,8 @@ export type CommentAgent = Agent<
 export const CommentAgentConfigSchema = z.object({
   name: z.string().describe("Name of the comment agent"),
   instructions: z.string().describe("Instructions for the comment agent"),
-  minLength: z
-    .number()
-    .min(0)
-    .describe("Minimum length of generated comments"),
-  maxLength: z
-    .number()
-    .min(0)
-    .describe("Maximum length of generated comments"),
+  minLength: z.number().min(0).describe("Minimum length of generated comments"),
+  maxLength: z.number().min(0).describe("Maximum length of generated comments"),
   model: z.string().optional().describe("Model to use for comment generation"),
 });
 
