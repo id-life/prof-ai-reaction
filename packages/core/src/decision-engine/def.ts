@@ -42,7 +42,7 @@ export const DecisionEngineConfigSchema = z.object({
 });
 
 export const defaultDecisionEngineConfig: DecisionEngineConfig = {
-  baseThreshold: 0.65,
+  baseThreshold: 0.4,
   minInterval: 20,
   maxInterval: 90,
   emotionWeight: 0.2,
@@ -51,7 +51,7 @@ export const defaultDecisionEngineConfig: DecisionEngineConfig = {
   importanceWeight: 0.6,
   keywordWeight: 0.3,
   frequencySuppression: 0.8,
-  timeDecayRate: 0.95,
+  timeDecayRate: 1,
 };
 
 export type DecisionEngineConfig = z.output<typeof DecisionEngineConfigSchema>;
