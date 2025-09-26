@@ -6,8 +6,17 @@ export class TextBuffer {
   private segments: TextSegment[] = [];
   private position = 0;
   private logger = getLogger(["ai-reaction", "text-buffer"]);
+  private segmenter = new Intl.Segmenter(undefined, { granularity: "word" });
 
   constructor(private config: TextBufferConfig) {}
+
+  private countWords(text: string): number {
+    const segments = Array.from(this.segmenter.segment(text));
+    return segments.filter(segment =>
+      segment.isWordLike &&
+      /\w/.test(segment.segment)
+    ).length;
+  }
 
   append(turn: Turn): void {
     const segment: TextSegment = {
@@ -24,8 +33,8 @@ export class TextBuffer {
       timestamp: turn.endTime,
       position: segment.position,
       totalSegments: this.segments.length,
-      bufferSizeCharacters: this.segments.reduce(
-        (sum, s) => sum + s.content.length,
+      bufferSizeWords: this.segments.reduce(
+        (sum, s) => sum + this.countWords(s.content),
         0,
       ),
     }));
@@ -46,7 +55,7 @@ export class TextBuffer {
           : 0,
       totalSegments: this.segments.length,
       windowSegments: filteredSegments.length,
-      windowCharacters: windowText.length,
+      windowWords: this.countWords(windowText),
       cutoffTimestamp: cutoff,
       nowTimestamp: now,
     }));
@@ -61,9 +70,13 @@ export class TextBuffer {
       .join(" ");
   }
 
-  getLastNCharacters(n: number): string {
-    const text = this.segments.map((s) => s.content).join(" ");
-    return text.slice(-n);
+  getLastNWords(n: number): string {
+    const allText = this.segments.map((s) => s.content).join(" ");
+    const segments = Array.from(this.segmenter.segment(allText));
+    const words = segments.filter(segment =>
+      segment.isWordLike && /\w/.test(segment.segment)
+    );
+    return words.slice(-n).map(w => w.segment).join("");
   }
 
   search(
@@ -109,7 +122,7 @@ export class TextBuffer {
 
     this.logger.debug("Buffer cleared", {
       previousSegmentCount: beforeStats.segmentCount,
-      previousTotalCharacters: beforeStats.totalCharacters,
+      previousTotalWords: beforeStats.totalWords,
       previousOldestTimestamp: beforeStats.oldestTimestamp,
       previousNewestTimestamp: beforeStats.newestTimestamp,
     });
@@ -119,6 +132,7 @@ export class TextBuffer {
     if (this.segments.length === 0) {
       return {
         totalCharacters: 0,
+        totalWords: 0,
         segmentCount: 0,
         oldestTimestamp: 0,
         newestTimestamp: 0,
@@ -130,13 +144,18 @@ export class TextBuffer {
       (sum, s) => sum + s.content.length,
       0,
     );
+    const totalWords = this.segments.reduce(
+      (sum, s) => sum + this.countWords(s.content),
+      0,
+    );
 
     return {
       totalCharacters: totalChars,
+      totalWords,
       segmentCount: this.segments.length,
       oldestTimestamp: this.segments[0].timestamp,
       newestTimestamp: this.segments[this.segments.length - 1].timestamp,
-      averageSegmentSize: totalChars / this.segments.length,
+      averageSegmentSize: totalWords / this.segments.length,
     };
   }
 
@@ -147,7 +166,7 @@ export class TextBuffer {
       requestedCount: count,
       actualCount: recent.length,
       totalSegments: this.segments.length,
-      recentCharacters: recent.reduce((sum, s) => sum + s.content.length, 0),
+      recentWords: recent.reduce((sum, s) => sum + this.countWords(s.content), 0),
     });
 
     return recent;

@@ -18,8 +18,8 @@
     // use typescript file directly, 
     // generated d.ts have some issue with zod type infer
     // https://github.com/colinhacks/zod/issues/3710#issuecomment-2381093862 
-    // "declaration": true,
-    // "declarationMap": true
+    "declaration": true,
+    "declarationMap": true
   },
   "include": [
     "src/**/*.ts"

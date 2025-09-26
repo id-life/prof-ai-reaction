@@ -4,7 +4,7 @@ export const TextBufferConfigSchema = z.object({
   bufferSize: z
     .number()
     .min(0)
-    .describe("Buffer size in characters"),
+    .describe("Buffer size in words"),
   windowDuration: z
     .number()
     .min(0)
@@ -12,7 +12,7 @@ export const TextBufferConfigSchema = z.object({
   segmentMaxSize: z
     .number()
     .min(0)
-    .describe("Maximum segment size in characters"),
+    .describe("Maximum segment size in words"),
   retentionTime: z
     .number()
     .min(0)
@@ -21,6 +21,7 @@ export const TextBufferConfigSchema = z.object({
 
 export const BufferStatsSchema = z.object({
   totalCharacters: z.number(),
+  totalWords: z.number(),
   segmentCount: z.number(),
   oldestTimestamp: z.number(),
   newestTimestamp: z.number(),
@@ -28,9 +29,9 @@ export const BufferStatsSchema = z.object({
 });
 
 export const defaultTextBufferConfig: TextBufferConfig = {
-  bufferSize: 100000,
+  bufferSize: 10000,
   windowDuration: 30,
-  segmentMaxSize: 100,
+  segmentMaxSize: 50,
   retentionTime: 300,
 };
 

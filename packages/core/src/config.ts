@@ -33,6 +33,7 @@ export type ApiKeys = {
 
 export const defaultContextBufferConfig: TextBufferConfig = {
   ...defaultTextBufferConfig,
+  bufferSize: 15000, // ~15k words for full context
   retentionTime: 3600, // 1 hour retention for full context
   windowDuration: 300, // 5 minute window for context
 };

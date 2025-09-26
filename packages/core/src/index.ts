@@ -7,8 +7,8 @@ export {
 } from "./comment-gen/index.js";
 export type {
   ApiKeys,
-  Config,
-  ConfigInput,
+  Config as CommentSystemConfig,
+  ConfigInput as CommentSystemConfigInput,
 } from "./config.js";
 export {
   defaultCommentGeneratorConfig,
