@@ -23,13 +23,15 @@ import {
 import { TextBuffer } from "./text-buffer/service.js";
 import { ShortTurnAggregator } from "./turn-agg/service.js";
 import type { Comment, Event, Turn } from "./type.js";
+import OpenAI from "openai";
 
 export interface CommentSystemEvents {
   "comment-started": (
     response: Awaited<ReturnType<typeof generateComment>>,
+    turn: Turn,
   ) => void;
-  "comment-rejected": (reason: string) => void;
-  "comment-generated": (comment: Comment) => void;
+  "comment-rejected": (reason: string, turn: Turn) => void;
+  "comment-generated": (comment: Comment, turn: Turn) => void;
   error: (error: unknown) => void;
 }
 
@@ -55,8 +57,8 @@ export class CommentSystem implements Disposable {
   on<E extends keyof CommentSystemEvents>(
     event: E,
     listener: CommentSystemEvents[E],
-  ): void {
-    this.emitter.on(event, listener);
+  ) {
+    return this.emitter.on(event, listener);
   }
 
   constructor(private options: CommentSystemOptions) {
@@ -356,11 +358,16 @@ export class CommentSystem implements Disposable {
 
       const commentResponse = await generateComment(context, {
         ...this.config.commentGenerator,
-        apiKeys: this.apiKeys,
+        openaiClient: this.apiKeys.openai
+          ? new OpenAI({
+              apiKey: this.apiKeys.openai,
+              dangerouslyAllowBrowser: true,
+            })
+          : undefined,
         // signal:
       });
 
-      this.emitter.emit("comment-started", commentResponse);
+      this.emitter.emit("comment-started", commentResponse, turn);
 
       // for await (const chunk of commentResponse) {
       //   if (chunk.type === "agent_updated_stream_event") {
@@ -380,7 +387,7 @@ export class CommentSystem implements Disposable {
           turnId: turn.id,
           generationTimeMs: Math.round(performance.now() - startCommentTime),
         });
-        this.emitter.emit("comment-rejected", commentResult.reason);
+        this.emitter.emit("comment-rejected", commentResult.reason, turn);
         return;
       }
 
@@ -410,7 +417,7 @@ export class CommentSystem implements Disposable {
       this.uncommentedBuffer.clear();
 
       // Emit comment
-      this.emitter.emit("comment-generated", comment);
+      this.emitter.emit("comment-generated", comment, turn);
 
       this.logger.info("Comment generated successfully", () => ({
         commentId: comment.id,

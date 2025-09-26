@@ -1,5 +1,5 @@
-import { run, setDefaultOpenAIKey } from "@openai/agents";
-import type { ApiKeys } from "../config.js";
+import { run, setDefaultOpenAIClient } from "@openai/agents";
+import type OpenAI from "openai";
 import type { Comment, Event } from "../type.js";
 import { buildCommentAgent } from "./agents/_base.js";
 import buildCommentGenerator from "./agents/selector.js";
@@ -12,16 +12,17 @@ export async function generateComment(
     writers,
     selectorInstructions,
     selectorModel,
-    apiKeys,
+    openaiClient,
   }: CommentGeneratorConfig & {
     signal?: AbortSignal;
-    apiKeys: Pick<ApiKeys, "openai">;
+    openaiClient?: OpenAI;
   },
 ) {
-  if (!apiKeys.openai) {
+  if (!openaiClient) {
     throw new Error("OpenAI API key is required to generate a comment");
   }
-  setDefaultOpenAIKey(apiKeys.openai);
+  // biome-ignore lint/suspicious/noExplicitAny: setDefaultOpenAIClient expects any
+  setDefaultOpenAIClient(openaiClient as any);
   const userInput = buildUserInput(context);
   const agent = buildCommentGenerator({
     writers: writers.map((w) => buildCommentAgent(w)),

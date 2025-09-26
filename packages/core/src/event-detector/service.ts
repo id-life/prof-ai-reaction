@@ -331,7 +331,10 @@ export class EventDetector {
       throw new Error("Invalid model provider");
     }
 
-    const openai = new OpenAI({ apiKey: this.apiKeys.openai });
+    const openai = new OpenAI({
+      apiKey: this.apiKeys.openai,
+      dangerouslyAllowBrowser: true,
+    });
     this.logger.debug("Calling OpenAI API", {
       model: this.config.model,
       hasAbortSignal: !!signal,
