@@ -273,7 +273,6 @@ export function CommentGeneratorConfigForm({
             )}
           </div>
         </div>
-
       </form>
     </Form>
   );

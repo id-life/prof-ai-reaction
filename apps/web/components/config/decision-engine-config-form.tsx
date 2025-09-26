@@ -136,7 +136,6 @@ export function DecisionEngineConfigForm({
             )}
           />
         ))}
-
       </form>
     </Form>
   );

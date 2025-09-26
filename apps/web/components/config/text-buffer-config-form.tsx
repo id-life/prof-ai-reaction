@@ -82,7 +82,6 @@ export function TextBufferConfigForm({
             )}
           />
         ))}
-
       </form>
     </Form>
   );

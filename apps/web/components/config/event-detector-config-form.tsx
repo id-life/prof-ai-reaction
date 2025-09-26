@@ -131,7 +131,6 @@ export function EventDetectorConfigForm({
             )}
           />
         ))}
-
       </form>
     </Form>
   );

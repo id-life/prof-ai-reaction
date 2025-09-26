@@ -91,7 +91,6 @@ export function ShortTurnAggregatorConfigForm({
             )}
           />
         ))}
-
       </form>
     </Form>
   );
