@@ -1,11 +1,11 @@
 "use client";
 
 import type { Comment, Turn } from "@prof/ai-reaction";
-import { Loader2, X, Check } from "lucide-react";
+import { Check, Loader2, X } from "lucide-react";
 
 interface CommentWithStatus extends Comment {
   turn: Turn;
-  status: 'generating' | 'completed' | 'rejected';
+  status: "generating" | "completed" | "rejected";
   partialText?: string;
   rejectionReason?: string;
 }
@@ -31,37 +31,40 @@ export function CommentFeed({ comments }: CommentFeedProps) {
         comments.map((comment) => {
           const getStatusIcon = () => {
             switch (comment.status) {
-              case 'generating':
+              case "generating":
                 return <Loader2 className="w-3 h-3 animate-spin" />;
-              case 'completed':
+              case "completed":
                 return <Check className="w-3 h-3 text-green-500" />;
-              case 'rejected':
+              case "rejected":
                 return <X className="w-3 h-3 text-red-500" />;
             }
           };
 
           const getContent = () => {
-            if (comment.status === 'generating') {
-              return comment.partialText || '';
+            if (comment.status === "generating") {
+              return comment.partialText || "";
             }
             return comment.content;
           };
 
           const getBorderColor = () => {
             switch (comment.status) {
-              case 'generating':
-                return 'border-blue-200';
-              case 'completed':
-                return 'border-green-200';
-              case 'rejected':
-                return 'border-red-200';
+              case "generating":
+                return "border-blue-200";
+              case "completed":
+                return "border-green-200";
+              case "rejected":
+                return "border-red-200";
               default:
-                return 'border';
+                return "border";
             }
           };
 
           return (
-            <div key={comment.id} className={`p-3 bg-muted/30 rounded border ${getBorderColor()}`}>
+            <div
+              key={comment.id}
+              className={`p-3 bg-muted/30 rounded border ${getBorderColor()}`}
+            >
               <div className="flex justify-between items-start mb-2">
                 <div className="flex items-center gap-2">
                   <span className="text-xs bg-primary/20 px-2 py-1 rounded">
@@ -74,20 +77,18 @@ export function CommentFeed({ comments }: CommentFeedProps) {
                 </span>
               </div>
               <p className="text-sm">{getContent()}</p>
-              {comment.status === 'rejected' && comment.rejectionReason && (
+              {comment.status === "rejected" && comment.rejectionReason && (
                 <div className="text-xs text-red-600 mt-1 italic">
                   Rejected: {comment.rejectionReason}
                 </div>
               )}
-              {comment.status === 'completed' && (
+              {comment.status === "completed" && (
                 <div className="text-xs text-muted-foreground mt-1">
                   Generated in {Math.round(comment.generationTime)}ms
                 </div>
               )}
-              {comment.status === 'generating' && (
-                <div className="text-xs text-blue-600 mt-1">
-                  Generating...
-                </div>
+              {comment.status === "generating" && (
+                <div className="text-xs text-blue-600 mt-1">Generating...</div>
               )}
             </div>
           );

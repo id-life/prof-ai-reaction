@@ -1,9 +1,12 @@
 "use client";
 
+import { PlayCircle } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import { ApiKeysForm } from "@/components/config/api-keys-form";
 import { ExportConfigButton } from "@/components/config/export-config-button";
 import { SystemConfigForm } from "@/components/config/system-config-form";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -11,10 +14,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import Link from "next/link";
-import { PlayCircle } from "lucide-react";
 
 export default function ConfigPage() {
   const [activeTab, setActiveTab] = useState("system");

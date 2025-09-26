@@ -37,7 +37,11 @@ export function CueDisplay({ turns, activeTurns, onSeek }: CueDisplayProps) {
       const containerRect = container.getBoundingClientRect();
       const cueRect = activeCueElement.getBoundingClientRect();
 
-      const scrollTop = container.scrollTop + (cueRect.top - containerRect.top) - (containerRect.height / 2) + (cueRect.height / 2);
+      const scrollTop =
+        container.scrollTop +
+        (cueRect.top - containerRect.top) -
+        containerRect.height / 2 +
+        cueRect.height / 2;
 
       container.scrollTo({
         top: scrollTop,

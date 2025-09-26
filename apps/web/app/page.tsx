@@ -9,6 +9,9 @@ import {
   type Turn,
 } from "@prof/ai-reaction";
 import { useAtom } from "jotai";
+import { Settings } from "lucide-react";
+import { nanoid } from "nanoid";
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiKeysAtom, systemConfigAtom } from "@/components/config/atom";
 import { CommentFeed } from "@/components/playground/comment-feed";
@@ -16,13 +19,10 @@ import { CueDisplay } from "@/components/playground/cue-display";
 import { InputSection } from "@/components/playground/input-section";
 import { LoggerSection } from "@/components/playground/logger-section";
 import { PlayerControls } from "@/components/playground/player-controls";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Player } from "@/lib/player";
 import { mimicTurns, parseSubtitle } from "@/lib/subtitle";
-import { nanoid } from "nanoid";
-import Link from "next/link";
-import { Settings } from "lucide-react";
 
 interface LogEntry {
   id: string;
@@ -35,7 +35,7 @@ interface LogEntry {
 
 interface CommentWithStatus extends Comment {
   turn: Turn;
-  status: 'generating' | 'completed' | 'rejected';
+  status: "generating" | "completed" | "rejected";
   partialText?: string;
   rejectionReason?: string;
 }
@@ -154,40 +154,37 @@ export default function PlaygroundPage() {
             setState((prev) => ({
               ...prev,
               comments: prev.comments.map((existingComment) =>
-                existingComment.status === 'generating' &&
+                existingComment.status === "generating" &&
                 existingComment.turn.id === turn.id
                   ? {
                       ...comment,
                       turn,
-                      status: 'completed' as const,
+                      status: "completed" as const,
                       partialText: undefined,
                     }
-                  : existingComment
+                  : existingComment,
               ),
             }));
           },
         ),
       );
       stack.defer(
-        commentSystem.on(
-          "comment-rejected",
-          (reason: string, turn: Turn) => {
-            setState((prev) => ({
-              ...prev,
-              comments: prev.comments.map((existingComment) =>
-                existingComment.status === 'generating' &&
-                existingComment.turn.id === turn.id
-                  ? {
-                      ...existingComment,
-                      status: 'rejected' as const,
-                      rejectionReason: reason,
-                      partialText: undefined,
-                    }
-                  : existingComment
-              ),
-            }));
-          },
-        ),
+        commentSystem.on("comment-rejected", (reason: string, turn: Turn) => {
+          setState((prev) => ({
+            ...prev,
+            comments: prev.comments.map((existingComment) =>
+              existingComment.status === "generating" &&
+              existingComment.turn.id === turn.id
+                ? {
+                    ...existingComment,
+                    status: "rejected" as const,
+                    rejectionReason: reason,
+                    partialText: undefined,
+                  }
+                : existingComment,
+            ),
+          }));
+        }),
       );
 
       stack.defer(
@@ -246,7 +243,7 @@ export default function PlaygroundPage() {
                 generationTime: 0,
                 metadata: { timestamp: turn.startTime },
                 turn,
-                status: 'generating' as const,
+                status: "generating" as const,
                 partialText: "",
               },
             ],
@@ -271,7 +268,7 @@ export default function PlaygroundPage() {
                   comments: prev.comments.map((comment) =>
                     comment.id === partialCommentId
                       ? { ...comment, partialText: "" }
-                      : comment
+                      : comment,
                   ),
                 }));
               }
@@ -284,7 +281,7 @@ export default function PlaygroundPage() {
                   comments: prev.comments.map((comment) =>
                     comment.id === partialCommentId
                       ? { ...comment, partialText: responseText }
-                      : comment
+                      : comment,
                   ),
                 }));
               }
@@ -413,7 +410,8 @@ export default function PlaygroundPage() {
           <div>
             <h1 className="text-3xl font-bold">Realtime Comment Playground</h1>
             <p className="text-muted-foreground mt-2">
-              Test AI comment generation with subtitle files or plain text input.
+              Test AI comment generation with subtitle files or plain text
+              input.
             </p>
           </div>
           <Button asChild variant="outline">
