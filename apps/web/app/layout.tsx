@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { Provider } from "jotai";
 import { Logger } from "./logger";
 
 export const metadata: Metadata = {
@@ -16,7 +17,7 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <Logger />
-        {children}
+        <Provider>{children}</Provider>
       </body>
     </html>
   );
