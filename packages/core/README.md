@@ -85,17 +85,14 @@ sequenceDiagram
 
 ### 2) 评论生成 commentGenerator
 - **writers: Array<{ name, instructions, minLength, maxLength, model? }>`**
-  - 配置多个“写手”（风格/口吻）。系统会让选择器在这些写手候选中挑一个最终输出。
+  - 配置多个“写手”（风格/口吻）。系统会让风格选择器在这些写手候选中挑一个输出。
   - `instructions`: 写手风格提示。`minLength/maxLength`: 字数控制。
   - `model` 可选：指定具体模型；不填则使用选择器默认。
 - **selectorModel: string**
-  - 选择器用来在多位写手结果中挑选最佳的一位；默认 `"gpt-5-mini"`。
+  - 风格选择器使用的模型；默认 `"gpt-5-mini"`。
 - **selectorInstructions: string**
-  - 给选择器的偏好提示，如“偏重简洁、强调关键信息”。
+  - 风格选择器的偏好提示
 
-调参要点：
-- 想要“稳定风格”：只保留 1 个写手并写好 `instructions`。
-- 想要“多样风格择优”：配置多位写手（不同口吻/长度），依赖选择器挑选。
 
 ### 3) 事件检测 eventDetector
 - **modelProvider: "openai" | "google"**：事件检测服务商。
